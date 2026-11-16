@@ -1,0 +1,41 @@
+---
+# A separate read-based postcondition; not a guarantee of enduring correctness.
+- name: Verify live target postcondition
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    edlab_token: "{{ lookup('ansible.builtin.env', 'EDLAB_TOKEN') }}"
+  tasks:
+    - name: Require prior action output
+      ansible.builtin.assert:
+        that:
+          - edlab_expected_version_after is defined
+          - edlab_expected_action_count is defined
+          - edlab_expected_status_after is defined
+          - edlab_token | length >= 24
+    - name: Read target after completed action
+      ansible.builtin.uri:
+        url: "{{ lab_api_url | regex_replace('/+$', '') }}/v1/state"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ edlab_token }}"
+        status_code: [200]
+        timeout: 12
+      register: result
+      changed_when: false
+      no_log: true
+    - name: Display actual post-action state
+      ansible.builtin.debug:
+        msg:
+          actual_version: "{{ result.json.version }}"
+          actual_status: "{{ result.json.status }}"
+          action_count: "{{ result.json.action_count }}"
+    - name: Require expected state and version after action
+      ansible.builtin.assert:
+        that:
+          - result.json.status == edlab_expected_status_after
+          - (result.json.version | int) == (edlab_expected_version_after | int)
+          - (result.json.action_count | int) == (edlab_expected_action_count | int)
+        success_msg: "POSTCONDITION PASS at verification time."
+        fail_msg: "POSTCONDITION FAILED: target changed or did not reach expected state."

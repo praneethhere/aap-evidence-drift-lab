@@ -1,0 +1,42 @@
+---
+- name: Capture live target evidence before approval
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    edlab_token: "{{ lookup('ansible.builtin.env', 'EDLAB_TOKEN') }}"
+  tasks:
+    - name: Verify required configuration exists
+      ansible.builtin.assert:
+        that:
+          - lab_api_url is defined
+          - (lab_api_url | string).startswith('https://')
+          - edlab_token | length >= 24
+        fail_msg: "HTTPS lab_api_url and an EDLAB_TOKEN custom credential are required."
+    - name: Retrieve actual synthetic target state
+      ansible.builtin.uri:
+        url: "{{ lab_api_url | regex_replace('/+$', '') }}/v1/state"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ edlab_token }}"
+        status_code: [200]
+        timeout: 12
+      register: snapshot
+      changed_when: false
+      no_log: true
+    - name: Show sanitized live evidence
+      ansible.builtin.debug:
+        msg:
+          target_id: "{{ snapshot.json.target_id }}"
+          version: "{{ snapshot.json.version }}"
+          status: "{{ snapshot.json.status }}"
+          source: "remote stateful SQLite-backed HTTP target"
+    - name: Pass captured live evidence through workflow
+      ansible.builtin.set_stats:
+        data:
+          edlab_approved_target: "{{ snapshot.json.target_id }}"
+          edlab_approved_version: "{{ snapshot.json.version | int }}"
+          edlab_approved_status: "{{ snapshot.json.status }}"
+          edlab_event_id: "aap-capture-{{ awx_job_id | default('local') }}"
+        per_host: false
+        aggregate: false

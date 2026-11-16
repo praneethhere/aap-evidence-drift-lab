@@ -1,0 +1,27 @@
+---
+# LAB ONLY — records AAP inventory host variables as a workflow artifact.
+# Does not change any real system.
+- name: Capture approval-time synthetic evidence
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Ensure synthetic target variables exist
+      ansible.builtin.assert:
+        that:
+          - lab_version is defined
+          - lab_status is defined
+        fail_msg: "Configure lab_version and lab_status on the synthetic inventory host."
+    - name: Display evidence observed before approval
+      ansible.builtin.debug:
+        msg:
+          observed_version: "{{ lab_version }}"
+          observed_status: "{{ lab_status }}"
+          source: "AAP inventory variables (synthetic target metadata)"
+    - name: Carry the captured evidence to downstream workflow jobs
+      ansible.builtin.set_stats:
+        data:
+          approved_lab_version: "{{ lab_version | int }}"
+          approved_lab_status: "{{ lab_status | string }}"
+        per_host: false
+        aggregate: false

@@ -1,0 +1,41 @@
+---
+# An intentionally NON-ATOMIC check; another actor may change state afterward.
+- name: Validate remote state before a later action
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    edlab_token: "{{ lookup('ansible.builtin.env', 'EDLAB_TOKEN') }}"
+  tasks:
+    - name: Require previous evidence
+      ansible.builtin.assert:
+        that:
+          - edlab_approved_target is defined
+          - edlab_approved_version is defined
+          - edlab_approved_status is defined
+          - edlab_token | length >= 24
+    - name: Fetch current remote target state
+      ansible.builtin.uri:
+        url: "{{ lab_api_url | regex_replace('/+$', '') }}/v1/state"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ edlab_token }}"
+        status_code: [200]
+        timeout: 12
+      register: current
+      changed_when: false
+      no_log: true
+    - name: Require current state to match captured evidence
+      ansible.builtin.assert:
+        that:
+          - current.json.target_id == edlab_approved_target
+          - (current.json.version | int) == (edlab_approved_version | int)
+          - current.json.status == edlab_approved_status
+        success_msg: "PRECHECK PASS; WARNING: target may still change before a subsequent action."
+        fail_msg: "PRECHECK BLOCK - live target differs from captured evidence."
+    - name: Report checked version
+      ansible.builtin.debug:
+        msg:
+          checked_version: "{{ current.json.version }}"
+          checked_status: "{{ current.json.status }}"
+          caveat: "Read-only check; NOT an atomic operation"

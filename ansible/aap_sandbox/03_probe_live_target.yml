@@ -1,0 +1,29 @@
+---
+# First step: no credentials or infrastructure mutation. Tests sandbox egress only.
+- name: Probe independent synthetic target from AAP
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Require temporary lab target URL
+      ansible.builtin.assert:
+        that:
+          - lab_api_url is defined
+          - (lab_api_url | string).startswith('https://')
+        fail_msg: "Set lab_api_url (HTTPS temporary tunnel URL) in the job template Extra Variables."
+    - name: Check target health
+      ansible.builtin.uri:
+        url: "{{ lab_api_url | regex_replace('/+$', '') }}/health"
+        method: GET
+        status_code: [200]
+        return_content: true
+        timeout: 12
+      register: edlab_probe
+      changed_when: false
+    - name: Confirm expected service responded
+      ansible.builtin.assert:
+        that:
+          - edlab_probe.json.ok | bool
+          - edlab_probe.json.service == 'evidence-drift-target'
+          - edlab_probe.json.schema_version | int == 1
+        success_msg: "PROBE PASS - AAP reached the independent synthetic target over HTTPS."

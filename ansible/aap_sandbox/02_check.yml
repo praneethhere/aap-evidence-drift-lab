@@ -1,0 +1,30 @@
+---
+# LAB ONLY — compares approved evidence to inventory variables loaded at job start.
+# This is a non-atomic pre-action check, NOT target-side conditional mutation.
+- name: Check approval evidence against synthetic state at job start
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Require inherited evidence and current synthetic state
+      ansible.builtin.assert:
+        that:
+          - approved_lab_version is defined
+          - approved_lab_status is defined
+          - lab_version is defined
+          - lab_status is defined
+        fail_msg: "Missing workflow artifacts or synthetic inventory variables; check set_stats propagation."
+    - name: Show historical and current values
+      ansible.builtin.debug:
+        msg:
+          approved_version: "{{ approved_lab_version }}"
+          approved_status: "{{ approved_lab_status }}"
+          job_start_version: "{{ lab_version }}"
+          job_start_status: "{{ lab_status }}"
+    - name: Reject synthetic evidence that changed during approval
+      ansible.builtin.assert:
+        that:
+          - (lab_version | int) == (approved_lab_version | int)
+          - (lab_status | string) == (approved_lab_status | string)
+        success_msg: "PASS — synthetic evidence matches the approval-time snapshot."
+        fail_msg: "EXPECTED DRIFT DETECTED — current synthetic state differs from approved evidence."

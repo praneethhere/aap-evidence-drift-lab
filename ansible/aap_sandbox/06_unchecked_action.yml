@@ -1,0 +1,46 @@
+---
+# DELIBERATELY UNSAFE BASELINE: server does not compare expected version.
+- name: Run unchecked synthetic action
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    edlab_token: "{{ lookup('ansible.builtin.env', 'EDLAB_TOKEN') }}"
+  tasks:
+    - name: Require captured context and credential
+      ansible.builtin.assert:
+        that:
+          - edlab_approved_target is defined
+          - edlab_event_id is defined
+          - edlab_token | length >= 24
+    - name: Apply synthetic action without conditional version enforcement
+      ansible.builtin.uri:
+        url: "{{ lab_api_url | regex_replace('/+$', '') }}/v1/actions/unchecked"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ edlab_token }}"
+        body_format: json
+        body:
+          target_id: "{{ edlab_approved_target }}"
+          event_id: "{{ edlab_event_id }}"
+          desired_status: healthy
+        status_code: [200]
+        timeout: 12
+      register: action_result
+      no_log: true
+    - name: Show sanitized action result
+      ansible.builtin.debug:
+        msg:
+          disposition: "{{ action_result.json.disposition }}"
+          mode: unchecked
+          version: "{{ action_result.json.version }}"
+          action_count: "{{ action_result.json.action_count }}"
+          WARNING: "This action does not enforce the earlier evidence snapshot."
+    - name: Propagate expected postcondition for verification
+      ansible.builtin.set_stats:
+        data:
+          edlab_expected_version_after: "{{ action_result.json.version | int }}"
+          edlab_expected_action_count: "{{ action_result.json.action_count | int }}"
+          edlab_expected_status_after: healthy
+        per_host: false
+        aggregate: false
