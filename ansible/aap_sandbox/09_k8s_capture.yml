@@ -1,0 +1,50 @@
+---
+- name: Capture versioned Kubernetes scale intent through lab gateway
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    edk_token: "{{ lookup('ansible.builtin.env', 'EDLAB_TOKEN') }}"
+  tasks:
+    - name: Require HTTPS gateway and custom credential
+      ansible.builtin.assert:
+        that:
+          - lab_api_url is defined
+          - (lab_api_url | string).startswith('https://')
+          - edk_token | length >= 32
+        fail_msg: "A trusted HTTPS lab_api_url and injected EDLAB_TOKEN are required"
+      no_log: true
+    - name: Capture scale subresource
+      ansible.builtin.uri:
+        url: "{{ lab_api_url | regex_replace('/+$', '') }}/v1/state"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ edk_token }}"
+        status_code: [200]
+        timeout: 20
+      register: edk_capture
+      changed_when: false
+      no_log: true
+    - name: Verify controlled starting condition
+      ansible.builtin.assert:
+        that:
+          - edk_capture.json.namespace == 'edlab-cas-lab'
+          - edk_capture.json.deployment == 'replica-intent'
+          - (edk_capture.json.replicas | int) == 2
+          - (edk_capture.json.resource_version | string | length) > 0
+        fail_msg: "Reset the disposable Kubernetes target to 2 replicas before launching"
+    - name: Show nonsecret capture evidence
+      ansible.builtin.debug:
+        msg:
+          resource_version: "{{ edk_capture.json.resource_version }}"
+          replicas: "{{ edk_capture.json.replicas }}"
+          namespace: "{{ edk_capture.json.namespace }}"
+          deployment: "{{ edk_capture.json.deployment }}"
+    - name: Carry approval evidence to downstream jobs
+      ansible.builtin.set_stats:
+        data:
+          edk_approved_version: "{{ edk_capture.json.resource_version | string }}"
+          edk_approved_replicas: "{{ edk_capture.json.replicas | int }}"
+          edk_approved_uid: "{{ edk_capture.json.uid | default('') }}"
+        aggregate: false
+        per_host: false

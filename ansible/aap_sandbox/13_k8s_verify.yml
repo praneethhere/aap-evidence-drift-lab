@@ -1,0 +1,40 @@
+---
+- name: Verify the final state and record the limits of the observation
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    edk_token: "{{ lookup('ansible.builtin.env', 'EDLAB_TOKEN') }}"
+  tasks:
+    - name: Ensure action artifacts were propagated
+      ansible.builtin.assert:
+        that:
+          - edk_approved_version is defined
+          - edk_action_kind is defined
+          - edk_expected_replicas_after is defined
+    - name: Observe final Kubernetes scale
+      ansible.builtin.uri:
+        url: "{{ lab_api_url | regex_replace('/+$', '') }}/v1/state"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ edk_token }}"
+        status_code: [200]
+        timeout: 20
+      register: edk_final
+      changed_when: false
+      no_log: true
+    - name: Verify the final desired state and evidence advancement
+      ansible.builtin.assert:
+        that:
+          - (edk_final.json.replicas | int) == (edk_expected_replicas_after | int)
+          - (edk_final.json.resource_version | string) != (edk_approved_version | string)
+        fail_msg: "Final state disagrees with expected disposition"
+    - name: Report the observation with scope limitation
+      ansible.builtin.debug:
+        msg:
+          path: "{{ edk_action_kind }}"
+          approved_version: "{{ edk_approved_version }}"
+          final_version: "{{ edk_final.json.resource_version }}"
+          final_replicas: "{{ edk_final.json.replicas }}"
+          result: final_state_matches_expected_value_at_observation_instant
+          limitation: does_not_establish_stable_readiness_or_future_correctness

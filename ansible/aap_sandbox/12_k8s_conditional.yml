@@ -1,0 +1,49 @@
+---
+- name: Test Kubernetes-native stale version rejection (expected defensive outcome)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    edk_token: "{{ lookup('ansible.builtin.env', 'EDLAB_TOKEN') }}"
+  tasks:
+    - name: Require capture artifact
+      ansible.builtin.assert:
+        that:
+          - edk_approved_version is defined
+          - (edk_approved_version | string | length) > 0
+    - name: Attempt version-bound Kubernetes scale via restricted adapter
+      ansible.builtin.uri:
+        url: "{{ lab_api_url | regex_replace('/+$', '') }}/v1/actions/conditional"
+        method: POST
+        body_format: json
+        body:
+          expected_resource_version: "{{ edk_approved_version | string }}"
+        headers:
+          Authorization: "Bearer {{ edk_token }}"
+        status_code: [200, 409]
+        timeout: 20
+      register: edk_action
+      no_log: true
+    - name: Require stale precondition to be rejected in this injected test
+      ansible.builtin.assert:
+        that:
+          - edk_action.status == 409
+          - edk_action.json.disposition == 'stale_precondition'
+          - (edk_action.json.replicas | int) == 4
+        fail_msg: "Expected native Kubernetes rejection (409) after external change; inspect the actual run"
+        success_msg: "Expected native Kubernetes stale-version rejection; final verification still required"
+    - name: Report nonsecret rejection evidence
+      ansible.builtin.debug:
+        msg:
+          http_status: "{{ edk_action.status }}"
+          disposition: "{{ edk_action.json.disposition }}"
+          replicas: "{{ edk_action.json.replicas }}"
+          resource_version: "{{ edk_action.json.resource_version }}"
+    - name: Carry guarded result to final verification
+      ansible.builtin.set_stats:
+        data:
+          edk_action_kind: guarded
+          edk_expected_replicas_after: 4
+          edk_action_reported_version: "{{ edk_action.json.resource_version | string }}"
+        aggregate: false
+        per_host: false

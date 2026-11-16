@@ -1,0 +1,36 @@
+---
+- name: Compare currently observed scale with originally approved evidence
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    edk_token: "{{ lookup('ansible.builtin.env', 'EDLAB_TOKEN') }}"
+  tasks:
+    - name: Check captured evidence is available
+      ansible.builtin.assert:
+        that:
+          - edk_approved_version is defined
+          - edk_approved_replicas is defined
+    - name: Read live scale state
+      ansible.builtin.uri:
+        url: "{{ lab_api_url | regex_replace('/+$', '') }}/v1/state"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ edk_token }}"
+        status_code: [200]
+        timeout: 20
+      register: edk_precheck
+      changed_when: false
+      no_log: true
+    - name: Assert precheck passes before the intentionally staged external change
+      ansible.builtin.assert:
+        that:
+          - (edk_precheck.json.resource_version | string) == (edk_approved_version | string)
+          - (edk_precheck.json.replicas | int) == (edk_approved_replicas | int)
+        fail_msg: "Precheck is already stale; reset and restart this controlled run"
+        success_msg: "Precheck passed; it does not protect a later action"
+    - name: Show nonsecret precheck details
+      ansible.builtin.debug:
+        msg:
+          resource_version: "{{ edk_precheck.json.resource_version }}"
+          replicas: "{{ edk_precheck.json.replicas }}"

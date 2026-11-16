@@ -1,0 +1,41 @@
+---
+- name: Demonstrate stale idempotent desired-state scale without a version precondition
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    edk_token: "{{ lookup('ansible.builtin.env', 'EDLAB_TOKEN') }}"
+  tasks:
+    - name: Require original approval artifact
+      ansible.builtin.assert:
+        that:
+          - edk_approved_version is defined
+          - (edk_approved_replicas | int) == 2
+    - name: Request desired replicas 3 without original version condition
+      ansible.builtin.uri:
+        url: "{{ lab_api_url | regex_replace('/+$', '') }}/v1/actions/unchecked"
+        method: POST
+        body_format: json
+        body: {}
+        headers:
+          Authorization: "Bearer {{ edk_token }}"
+        status_code: [200]
+        timeout: 20
+      register: edk_action
+      no_log: true
+    - name: Record observed action response
+      ansible.builtin.debug:
+        msg:
+          action: unchecked_idempotent_desired_state
+          disposition: "{{ edk_action.json.disposition }}"
+          replicas: "{{ edk_action.json.replicas }}"
+          resource_version: "{{ edk_action.json.resource_version }}"
+          api: native_kubernetes_kubectl_scale
+    - name: Carry action result to final verifier
+      ansible.builtin.set_stats:
+        data:
+          edk_action_kind: unchecked
+          edk_expected_replicas_after: 3
+          edk_action_reported_version: "{{ edk_action.json.resource_version | string }}"
+        aggregate: false
+        per_host: false
