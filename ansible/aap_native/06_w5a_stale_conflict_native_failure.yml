@@ -1,0 +1,115 @@
+---
+- name: Demonstrate native AAP stale-version rejection with a real failing task
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Require exact experiment inputs
+      ansible.builtin.assert:
+        that:
+          - ev_expected_uid is defined
+          - ev_stale_resource_version is defined
+          - (ev_expected_uid | string | length) > 0
+          - (ev_stale_resource_version | string | length) > 0
+        fail_msg: 'STOP: missing experimental identity/version'
+
+    - name: Read isolated Deployment before the intentionally stale patch
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        namespace: praneethhere-dev
+        name: edlab-approval-target
+      register: before
+      no_log: true
+
+    - name: Prove that the independent change preceded this task
+      ansible.builtin.assert:
+        that:
+          - before.resources | length == 1
+          - before.resources[0].metadata.uid == ev_expected_uid
+          - (before.resources[0].spec.replicas | int) == 2
+          - (before.resources[0].metadata.resourceVersion | string) != (ev_stale_resource_version | string)
+        fail_msg: 'STOP: expected previously changed Deployment was not found'
+
+    - name: Exercise native task failure, classification and readback
+      block:
+        - name: Attempt native stale conditional patch
+          kubernetes.core.k8s:
+            state: patched
+            api_version: apps/v1
+            kind: Deployment
+            namespace: praneethhere-dev
+            name: edlab-approval-target
+            merge_type:
+              - merge
+            definition:
+              metadata:
+                resourceVersion: "{{ ev_stale_resource_version | string }}"
+              spec:
+                replicas: 1
+          register: native_patch_result
+          no_log: true
+
+      rescue:
+        - name: Extract conflict evidence only from native task failure
+          ansible.builtin.set_fact:
+            native_failed_task_correct: "{{ (ansible_failed_task.name | default('')) == 'Attempt native stale conditional patch' }}"
+            native_failure_message: "{{ (ansible_failed_result.msg | default('')) | string }}"
+          no_log: true
+
+        - name: Classify native API error without printing details
+          ansible.builtin.set_fact:
+            native_409_code: >-
+              {{ '"code":409' in (native_failure_message | replace(' ', '')) }}
+            native_conflict_reason: >-
+              {{ '"reason":"Conflict"' in (native_failure_message | replace(' ', '')) }}
+            native_patch_error_context: "{{ 'Failed to patch object:' in native_failure_message }}"
+          no_log: true
+
+        - name: Print bounded error categories
+          ansible.builtin.debug:
+            msg:
+              - "W5A_NATIVE_TASK_FAILED={{ 'YES' if (native_failed_task_correct | bool) else 'NO' }}"
+              - "W5A_NATIVE_HTTP_409={{ 'YES' if (native_409_code | bool) else 'NO' }}"
+              - "W5A_NATIVE_REASON_CONFLICT={{ 'YES' if (native_conflict_reason | bool) else 'NO' }}"
+              - "W5A_NATIVE_PATCH_ERROR={{ 'YES' if (native_patch_error_context | bool) else 'NO' }}"
+
+        - name: Require server-generated native patch conflict
+          ansible.builtin.assert:
+            that:
+              - native_failed_task_correct | bool
+              - native_409_code | bool
+              - native_conflict_reason | bool
+              - native_patch_error_context | bool
+            fail_msg: 'STOP: native patch failure not classifiable as Kubernetes 409 Conflict'
+
+        - name: Independently re-read Deployment after rejection
+          kubernetes.core.k8s_info:
+            api_version: apps/v1
+            kind: Deployment
+            namespace: praneethhere-dev
+            name: edlab-approval-target
+          register: after
+          no_log: true
+
+        - name: Require original external edit preserved
+          ansible.builtin.assert:
+            that:
+              - after.resources | length == 1
+              - after.resources[0].metadata.uid == ev_expected_uid
+              - (after.resources[0].spec.replicas | int) == 2
+            fail_msg: 'STOP: external change not preserved after native patch failure'
+
+        - name: Report successful negative control
+          ansible.builtin.debug:
+            msg:
+              - 'W5A_NATIVE_READBACK=PASS'
+              - 'W5A_STALE_NEGATIVE_CONTROL=PASS'
+
+        - name: Terminate with failure to test AAP failure-edge semantics
+          ansible.builtin.fail:
+            msg: 'AAP_NATIVE_STALE_CONFLICT=PASS (intentional failed AAP job)'
+
+    - name: Fail if the stale write unexpectedly returned successfully
+      ansible.builtin.fail:
+        msg: 'STOP: stale native patch returned without module failure'
