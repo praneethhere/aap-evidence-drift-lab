@@ -1,0 +1,35 @@
+---
+- name: Diagnose Python dependencies required by native Kubernetes write module
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Probe imports in AAP execution environment
+      ansible.builtin.command:
+        argv:
+          - "{{ ansible_playbook_python }}"
+          - -c
+          - |
+            import importlib.util
+            import sys
+            missing = []
+            for label, module in [('KUBERNETES', 'kubernetes'), ('PYYAML', 'yaml'), ('JSONPATCH', 'jsonpatch')]:
+                present = importlib.util.find_spec(module) is not None
+                print('W5A_IMPORT_' + label + '=' + ('PASS' if present else 'MISSING'))
+                if not present:
+                    missing.append(label)
+            print('W5A_EE_DEPENDENCIES=' + ('PASS' if not missing else 'MISSING'))
+            sys.exit(0 if not missing else 10)
+      register: dependency_probe
+      changed_when: false
+      failed_when: false
+    - name: Print only dependency booleans
+      ansible.builtin.debug:
+        msg: "{{ dependency_probe.stdout_lines }}"
+    - name: Require all three Python dependencies
+      ansible.builtin.assert:
+        that:
+          - dependency_probe.rc == 0
+          - "'W5A_IMPORT_JSONPATCH=PASS' in dependency_probe.stdout"
+        fail_msg: "W5A_EE_DEPENDENCIES=FAIL (missing module; no writes attempted)"
+        success_msg: "W5A_EE_DEPENDENCIES=PASS (no writes attempted)"
