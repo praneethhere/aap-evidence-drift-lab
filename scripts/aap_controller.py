@@ -132,12 +132,35 @@ def ensure_workflow(api, mode, template_ids, *, organization, inventory, apply):
         node_id = node["id"]
         if node_type == "approval":
             api.call("POST", f"workflow_job_template_nodes/{node_id}/create_approval_template/",
-                     {"name": f"EDK {identifier} - {mode}", "timeout": 7200})
+                     {"name": f"EDK {identifier} - {mode}", "timeout": 0})
         node_ids.append(node_id)
     for previous, following in zip(node_ids, node_ids[1:]):
         api.call("POST", f"workflow_job_template_nodes/{previous}/success_nodes/", {"id": following})
     print(f"CREATED workflow {name}, id={workflow_id}, 6 nodes")
     return workflow_id
+
+
+def collect_approvals(api, workflow_job_id):
+    """Find approvals by stable workflow-node identifier, not optional job_type.
+
+    AAP 4.8 can return job_type=null on workflow job nodes, including approvals.
+    The concrete approval is queried only once the node has a job ID.
+    """
+    nodes = api.list(f"workflow_jobs/{workflow_job_id}/workflow_nodes", page_size=100)
+    result = []
+    for node in nodes:
+        identifier = node.get("identifier")
+        if identifier not in ("approve_capture", "experimental_hold"):
+            continue
+        job_id = node.get("job")
+        if not job_id:
+            result.append({"identifier": identifier, "approval_id": None,
+                           "status": "not_started"})
+            continue
+        approval = api.call("GET", f"workflow_approvals/{job_id}/")
+        result.append({"identifier": identifier, "approval_id": approval.get("id"),
+                       "status": approval.get("status")})
+    return result
 
 
 def print_json(obj):
@@ -196,14 +219,7 @@ def main(argv=None):
                                    "job": x.get("job"), "type": x.get("job_type")}
                                   for x in nodes]})
         elif args.command == "approvals":
-            nodes = api.list(f"workflow_jobs/{args.workflow_job_id}/workflow_nodes")
-            items = []
-            for node in nodes:
-                if node.get("job_type") == "workflow_approval" and node.get("job"):
-                    approval = api.call("GET", f"workflow_approvals/{node['job']}/")
-                    items.append({"identifier": node.get("identifier"), "approval_id": approval.get("id"),
-                                  "status": approval.get("status")})
-            print_json(items)
+            print_json(collect_approvals(api, args.workflow_job_id))
         elif args.command == "approve":
             print_json(api.call("POST", f"workflow_approvals/{args.approval_id}/approve/", {}))
         return 0

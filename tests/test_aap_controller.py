@@ -1,7 +1,7 @@
 """Local API contract tests; does NOT contact AAP."""
 import json
 import unittest
-from scripts.aap_controller import ControllerAPI, APIError, PLAYBOOKS, WORKFLOWS, ensure_template, ensure_workflow
+from scripts.aap_controller import ControllerAPI, APIError, PLAYBOOKS, WORKFLOWS, ensure_template, ensure_workflow, collect_approvals
 
 
 class FakeAAP:
@@ -69,6 +69,51 @@ class AAPProvisionTests(unittest.TestCase):
         self.assertEqual(len(links), 10)
         self.assertEqual({n[2]["identifier"] for n in nodes},
                          {"capture", "approve_capture", "precheck", "experimental_hold", "action", "verify"})
+
+    def test_new_approval_nodes_have_no_expiration(self):
+        api = FakeAAP()
+        template_ids = {k: idx + 101 for idx, k in enumerate(PLAYBOOKS)}
+        ensure_workflow(api, "guarded", template_ids, organization=1,
+                        inventory=2, apply=True)
+        approvals = [request for request in api.requests
+                     if "create_approval_template/" in request[1]]
+        self.assertEqual(len(approvals), 2)
+        self.assertTrue(all(req[2]["timeout"] == 0 for req in approvals))
+
+    def test_approval_discovery_ignores_null_job_type(self):
+        class FakeLive:
+            def list(self, path, **kwargs):
+                self_path = path
+                assert self_path == "workflow_jobs/64/workflow_nodes"
+                return [
+                    {"identifier": "capture", "job": 65, "job_type": None},
+                    {"identifier": "approve_capture", "job": 66, "job_type": None},
+                    {"identifier": "experimental_hold", "job": 68, "job_type": None},
+                    {"identifier": "action", "job": None, "job_type": None},
+                ]
+            def call(self, method, path):
+                self_approval = int(path.split("/")[1])
+                return {"id": self_approval, "status":
+                        "successful" if self_approval == 66 else "pending"}
+        approvals = collect_approvals(FakeLive(), 64)
+        self.assertEqual(approvals, [
+            {"identifier": "approve_capture", "approval_id": 66,
+             "status": "successful"},
+            {"identifier": "experimental_hold", "approval_id": 68,
+             "status": "pending"},
+        ])
+
+    def test_approval_discovery_reports_unstarted(self):
+        class FakeLive:
+            def list(self, path, **kwargs):
+                return [{"identifier": "approve_capture", "job": None,
+                         "job_type": None}]
+            def call(self, *args):
+                raise AssertionError("Must not fetch missing approval")
+        self.assertEqual(collect_approvals(FakeLive(), 53), [
+            {"identifier": "approve_capture", "approval_id": None,
+             "status": "not_started"},
+        ])
 
     def test_created_job_templates_use_correct_playbooks(self):
         api = FakeAAP()
