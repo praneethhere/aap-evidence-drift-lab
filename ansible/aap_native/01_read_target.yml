@@ -1,0 +1,22 @@
+---
+- name: Read the isolated OpenShift research Deployment from AAP
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Read the named research Deployment using dedicated credentials
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: edlab-approval-target
+        namespace: praneethhere-dev
+      register: read_result
+      no_log: true
+    - name: Verify the exact expected target and baseline
+      ansible.builtin.assert:
+        that:
+          - read_result.resources | length == 1
+          - read_result.resources[0].metadata.name == 'edlab-approval-target'
+          - read_result.resources[0].metadata.namespace == 'praneethhere-dev'
+          - read_result.resources[0].spec.replicas | int == 0
+        success_msg: 'AAP_NATIVE_K8S_READ=PASS target=edlab-approval-target replicas=0'
