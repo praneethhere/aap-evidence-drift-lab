@@ -1,10 +1,63 @@
 # Evidence Drift Lab
 
-**A reproducible engineering lab for stale decisions in approved automation.** It examines the gap between an approval/precheck and the eventual mutation of a target system. The primary demonstration now uses **real Kubernetes desired-replica updates** orchestrated through Red Hat Ansible Automation Platform (AAP) workflows. An earlier, intentionally synthetic Python/SQLite target remains available for comparison.
+**An engineering lab for stale decisions in approved automation.** It examines the gap between an approval/precheck and the eventual mutation of a target system. The primary demonstration uses **real Kubernetes desired-replica updates** orchestrated through Red Hat Ansible Automation Platform (AAP) workflows. The local `kind` matrix is reproducible from this repository; the AAP experiments are recorded lab runs whose AAP-side setup is only partly published. An earlier, intentionally synthetic Python/SQLite target remains available for comparison.
 
 > **Question:** Can a successful approval, a passing precheck, and a successful final-state verifier coexist with an action that overwrites a newer infrastructure decision?
 
-## Observed results (controlled lab, November 2026)
+## Native AAP/OpenShift approval experiment (November 2026)
+
+A second demonstration runs the Kubernetes calls **inside the AAP execution
+environment** with `kubernetes.core.k8s` and `k8s_info`, using Red Hat Ansible
+Automation Platform 2.7 against a single test Deployment in a personal OpenShift
+namespace. Unlike the adapter-based experiment below, the HTTP 409 here is
+returned by the **Kubernetes API server itself**.
+
+Each conditional write carries the `metadata.resourceVersion` recorded before
+its approval hold. The Kubernetes API server rejects the write if that object
+version is stale. This **guards the write**, not the approval decision itself.
+The workflow recaptures fresh state and asks for a second approval only after
+the first failed write is classified as a 409 conflict.
+
+Three manually staged runs were recorded:
+
+| Scenario | AAP workflow job | Recorded outcome |
+| --- | ---: | --- |
+| No change after approval | 93 | Conditional write (0 → 1 desired replicas) succeeded; post-write read-back passed |
+| Deliberate change during approval; second approval denied | 99 | API-server 409; fresh state captured; denial ended the workflow as failed; no further write attempted |
+| Deliberate change during approval; second approval granted | 105 | API-server 409; fresh state captured; a **new** conditional write (2 → 1) succeeded; post-write read-back passed |
+
+These outcomes come from the author's AAP job records and a self-run consistency
+check of those records: all 11 child jobs report source revision
+[`ac14dd54a57c`](https://github.com/praneethhere/aap-evidence-drift-lab/tree/ac14dd54a57c39f8999217a6c982f01d49545c38).
+The exported records are **not published**, so the outcomes cannot be checked
+independently from this repository.
+
+The workflow playbooks are `ansible/aap_native/20_capture.yml` through
+`25_verify_second.yml`. Files `00`–`06` in the same directory are earlier
+diagnostic probes. The AAP workflow definition, credential setup, and the helper
+that displayed evidence to the approver are **not** published.
+
+**Limitations that matter most:**
+
+- The approver saw the captured evidence through a custom CLI, then approved
+  through the AAP API. Whether AAP's own approval interface shows that evidence
+  was **not tested**. The workflow binds the *write* to the captured state; it
+  does not bind the *approval decision* to what the approver saw.
+- The verify jobs are separate read-back jobs against the same API server,
+  not independent external observers. In the tested setup, read and write job
+  templates used different service-account credentials, but the credential and
+  RBAC configuration is not published. Read-back checks UID, desired replicas,
+  and a one-step `generation` change at read time, not readiness, availability,
+  or who made the change.
+- No one has reproduced this from public instructions. It is not a benchmark, a
+  production safety guarantee, or an AAP defect.
+
+Details: [native AAP evidence and limitations](docs/AAP_NATIVE_APPROVAL_EVIDENCE.md).
+
+The adapter-based AAP experiment below is kept for comparison. Its HTTP 409 was
+issued by the lab's restricted adapter, not by the Kubernetes API server.
+
+## Adapter-based AAP experiment and local matrix (earlier, November 2026)
 
 **Local Kubernetes matrix:** One six-case experiment ran on a disposable `kind` Kubernetes v1.37.0 cluster. The tests included a no-drift control, stale unchecked scaling, stale `resourceVersion` scaling, replica-count checking, and two ABA cases. The [observed matrix](docs/KUBERNETES_NATIVE_RESULTS.md) records the exact captured/final values and relevant `kubectl` error text.
 
@@ -81,7 +134,7 @@ The five playbooks in [`ansible/aap_sandbox/09_k8s_capture.yml`](ansible/aap_san
    Inject the matching `EDLAB_TOKEN` through local environment/custom AAP credentials, never through Git or public job extra variables.
 2. Give the AAP sandbox temporary HTTPS access **only to the restricted adapter**, not to Kubernetes API, kubeconfig, or the Docker host. Verify the tunnel and leave it running throughout the experiment.
 3. Sync this repository as an AAP project. Use the **gateway-issued AAP token** (`AAP_TOKEN`, distinct from `EDLAB_TOKEN`) for `python3 scripts/aap_controller.py doctor` and API-based project/workflow setup.
-4. Use `scripts/aap_controller.py provision` **without `--apply` first**. Review its plan and actual AAP resource permissions; `--apply` creates or updates scoped lab templates. See [`docs/AAP_NATIVE_API_EXECUTION.md`](docs/AAP_NATIVE_API_EXECUTION.md) for the specific API sequence.
+4. Use `scripts/aap_controller.py provision` **without `--apply` first**. Review its plan and actual AAP resource permissions; `--apply` creates or updates scoped lab templates. See [`docs/AAP_NATIVE_API_EXECUTION.md`](docs/AAP_NATIVE_API_EXECUTION.md) for the specific API sequence (this document covers the adapter-based workflow, not the native AAP/OpenShift workflow).
 5. For each workflow **separately**, reset desired replicas to 2; capture, approve the first hold, ensure precheck succeeds with original evidence, stop at the second hold, deliberately scale to 4 **outside AAP**, and only then approve that hold. Inspect both the AAP job events and the actual Kubernetes Scale subresource. **Never automatically rerun after a partially completed experiment.**
 
 The standalone local matrix does **not** require AAP, a token, or a public tunnel. The AAP comparison uses human-directed injections so it does not measure spontaneous race frequency. Read the [AAP evidence-export instructions](docs/AAP_EVIDENCE_EXPORT_AND_FIX.md) before inspecting or sharing job records. The private AAP export is **not** committed to this repository.
@@ -97,7 +150,8 @@ Practical lesson: **idempotence is not the same as authorization freshness**. Us
 ## Other repository materials
 
 - [`k8s_native/`](k8s_native/) — scoped cluster harness and restricted adapter.
-- [`scripts/aap_controller.py`](scripts/aap_controller.py) — AAP REST workflow provisioning and approval controls (no automatic approval).
+- [`scripts/aap_controller.py`](scripts/aap_controller.py) — AAP REST provisioning and approval controls for the **adapter-based** workflow only (no automatic approval); it does not build the native workflow.
+- [`ansible/aap_native/`](ansible/aap_native/) — native workflow playbooks `20`–`25` and earlier diagnostic probes `00`–`06`.
 - [`scripts/export_aap_evidence.py`](scripts/export_aap_evidence.py) — read-only, allowlisted AAP event export and paired consistency checks.
 - [`target/`](target/) — earlier SQLite-backed synthetic HTTP service.
 - [`results/aap/EXPERIMENT_EVIDENCE_V3.md`](results/aap/EXPERIMENT_EVIDENCE_V3.md) — separate older SQLite/AAP observations; **not** native Kubernetes results.
