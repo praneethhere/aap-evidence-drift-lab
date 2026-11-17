@@ -1,0 +1,73 @@
+---
+- name: W5B enforce first approved precondition
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Require evidence from first capture
+      ansible.builtin.assert:
+        that:
+          - ev1_uid is defined
+          - ev1_rv is defined
+          - ev1_gen is defined
+          - (ev1_replicas | int) == 0
+          - (ev1_desired | int) == 1
+          - ev1_namespace == 'praneethhere-dev'
+          - ev1_name == 'edlab-approval-target'
+        fail_msg: 'STOP: missing or unexpected approval evidence'
+
+    - name: Execute server-enforced first conditional write
+      block:
+        - name: Apply approved native conditional patch
+          kubernetes.core.k8s:
+            state: patched
+            api_version: apps/v1
+            kind: Deployment
+            namespace: praneethhere-dev
+            name: edlab-approval-target
+            merge_type:
+              - merge
+            definition:
+              metadata:
+                resourceVersion: "{{ ev1_rv | string }}"
+              spec:
+                replicas: 1
+          register: first_patch
+          no_log: true
+
+        - name: Report first action submitted
+          ansible.builtin.debug:
+            msg: 'W5B_ACTION1_PATCH_APPLIED=YES (verify independently)'
+
+      rescue:
+        - name: Capture native error internally
+          ansible.builtin.set_fact:
+            ev_native_error: "{{ (ansible_failed_result.msg | default('')) | string }}"
+            ev_correct_native_task: "{{ (ansible_failed_task.name | default('')) == 'Apply approved native conditional patch' }}"
+          no_log: true
+
+        - name: Prove this is a Kubernetes 409, not an unrelated failure
+          ansible.builtin.assert:
+            that:
+              - ev_correct_native_task | bool
+              - >-
+                '"code":409' in (ev_native_error | replace(' ', ''))
+              - >-
+                '"reason":"Conflict"' in (ev_native_error | replace(' ', ''))
+              - "'Failed to patch object:' in ev_native_error"
+            fail_msg: 'STOP: action failed for a reason other than a proven native 409 conflict'
+
+        - name: Export explicit conflict evidence for failure-edge classifier
+          ansible.builtin.set_stats:
+            data:
+              ev1_native_conflict_409: true
+              ev1_conflict_uid: "{{ ev1_uid }}"
+            per_host: false
+
+        - name: Print safe conflict classification
+          ansible.builtin.debug:
+            msg: 'W5B_ACTION1_NATIVE_409=YES'
+
+        - name: Leave action job failed to trigger AAP failure edge
+          ansible.builtin.fail:
+            msg: 'W5B_ACTION1_REJECTED_STALE=YES (intentionally failed job)'

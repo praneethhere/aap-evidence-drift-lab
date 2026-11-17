@@ -1,0 +1,44 @@
+---
+- name: W5B capture approved premise
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Read isolated target before approval
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: edlab-approval-target
+        namespace: praneethhere-dev
+      register: target
+      no_log: true
+
+    - name: Require correct identity and initial zero baseline
+      ansible.builtin.assert:
+        that:
+          - target.resources | length == 1
+          - target.resources[0].metadata.name == 'edlab-approval-target'
+          - target.resources[0].metadata.namespace == 'praneethhere-dev'
+          - target.resources[0].metadata.labels.research == 'aap-approval-lab'
+          - (target.resources[0].spec.replicas | int) == 0
+        fail_msg: 'STOP: incorrect or nonzero experiment target'
+
+    - name: Export approval evidence as workflow artifacts
+      ansible.builtin.set_stats:
+        data:
+          ev1_uid: "{{ target.resources[0].metadata.uid }}"
+          ev1_rv: "{{ target.resources[0].metadata.resourceVersion | string }}"
+          ev1_gen: "{{ target.resources[0].metadata.generation | int }}"
+          ev1_replicas: "{{ target.resources[0].spec.replicas | int }}"
+          ev1_desired: 1
+          ev1_namespace: praneethhere-dev
+          ev1_name: edlab-approval-target
+        per_host: false
+
+    - name: Show approval evidence without secret data
+      ansible.builtin.debug:
+        msg:
+          - 'W5B_CAPTURE=PASS'
+          - 'Approve proposed change: replicas 0 -> 1'
+          - "Captured resourceVersion={{ target.resources[0].metadata.resourceVersion }}"
+          - "Captured generation={{ target.resources[0].metadata.generation }}"
