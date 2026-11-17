@@ -1,6 +1,6 @@
 # Reproducing the Kubernetes-native scale precondition experiment
 
-**Evidence status (November 16, 2026):** The 58-test local suite passed, and **all six native Kubernetes v1.37.0 matrix scenarios completed successfully** on the experimenter's disposable `kind` cluster. See [the observed six-case results](KUBERNETES_NATIVE_RESULTS.md). **AAP-orchestrated Kubernetes workflow runs are not yet verified.**
+**Evidence status (November 16, 2026):** The 58-test local suite passed, and **all six native Kubernetes v1.37.0 matrix scenarios completed successfully** on the experimenter's disposable `kind` cluster. See [the observed six-case results](KUBERNETES_NATIVE_RESULTS.md). **Two AAP-orchestrated Kubernetes workflow runs are now observed and separately audited:** unchecked scaling overwrote the newer desired count (final 3); a version-guarded action returned the restricted adapter's expected stale-precondition rejection (final 4). See [the paired evidence appendix](AAP_K8S_EVIDENCE_APPENDIX.md).
 
 ## Scope
 
@@ -44,7 +44,7 @@ fresh evidence. A `kubectl` client-side precondition failure is not itself
 proof of an HTTP 409 response from the API server; the restricted AAP adapter
 maps recognized guard conflicts to an HTTP 409 response of its own.
 
-A precondition error alone **does not establish** whether a version change was caused by a controller or the experiment. The successful six-case run is described in [KUBERNETES_NATIVE_RESULTS.md](KUBERNETES_NATIVE_RESULTS.md), alongside its limits. Do not infer an AAP result from the local matrix.
+A precondition error alone **does not establish** whether a version change was caused by a controller or the experiment. The successful six-case run is described in [KUBERNETES_NATIVE_RESULTS.md](KUBERNETES_NATIVE_RESULTS.md), alongside its limits. The local matrix alone is not evidence of an AAP result; the **independent AAP workflow runs** are documented in [the paired evidence appendix](AAP_K8S_EVIDENCE_APPENDIX.md).
 
 ## AAP bridge architecture
 
@@ -74,7 +74,7 @@ The five AAP playbooks are numbered `09`–`13` in `ansible/aap_sandbox/`. They 
 
 After pushing these playbooks to the AAP project's Git repository and syncing the project, run `python3 scripts/aap_controller.py doctor` to discover project, inventory, credential and organization IDs available to the token. `provision` only plans changes unless passed `--apply`; it creates uniquely named job templates and two workflow templates. `launch`, `status`, `approvals`, and `approve` support API-only operation of the experiment. Approvals remain explicit user actions and are not autoapproved.
 
-If an AAP endpoint's validation or permissions differ from the expected schema, stop; inspect that version's API/OPTIONS contract rather than bypassing security checks. **The REST provisioning has only been tested against a local fake AAP object model, not a live controller.**
+If an AAP endpoint's validation or permissions differ from the expected schema, stop; inspect that version's API/OPTIONS contract rather than bypassing security checks. **The REST provisioning and both six-node workflows have now executed against a real AAP Developer Sandbox.** The helper also retains local mocked API tests; do not treat those tests as independent AAP runs.
 
 For the paired AAP study, reset target to 2 before each run. Launch workflow, explicitly approve the first node, verify precheck passed, pause at the second approval, externally change target to 4 via the local `inject` command, and explicitly approve the hold. The unchecked job should return target to 3. The guarded job should observe an expected Kubernetes-native precondition conflict and preserve 4. The guarded playbook treats an expected rejection as a passing *defensive test outcome*, and the verifier checks the final state.
 

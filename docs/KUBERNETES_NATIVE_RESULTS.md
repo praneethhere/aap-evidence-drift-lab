@@ -20,10 +20,14 @@ The stale-version case reported `error: Expected resource version to be 2324, wa
 ## Interpretation and limitations
 
 - **Proven in the local run:** An idempotent desired-replica update could overwrite the later declared desired count, while the guarded commands refused the specific stale request in this staged sequence. Matching a prior value after an ABA sequence did not establish unchanged history.
-- **Not established:** Real-world frequency, production availability, actual ready-replica count, customer outcome, a novel concurrency algorithm, or an AAP-specific result. The matrix ran locally against Kubernetes; **no AAP-integrated Kubernetes comparison has yet been recorded**.
+- **Not established:** Real-world frequency, production availability, actual ready-replica count, customer outcome, a novel concurrency algorithm, or an AAP-specific result. The matrix ran locally against Kubernetes; **the two later AAP-integrated runs are separately recorded in [AAP_K8S_EVIDENCE_APPENDIX.md](AAP_K8S_EVIDENCE_APPENDIX.md)**.
 - Kubernetes controllers can also advance versions via status changes, producing false-positive freshness failures. The harness records or rejects such unexpected changes during capture and the no-drift control. Guards ensure conservative rejection, not permanent correctness or business-level authorization.
 - The underlying `kubectl scale --resource-version` implementation validates the fetched Scale object and submits the version-bearing update. The observed error may arise before a write is sent to the server. Do **not** call these errors observed HTTP 409s from Kubernetes.
-- The local CLI experiment and subsequent AAP runs must remain separated in all public claims and CFP wording until AAP has produced its own evidence.
+- The local CLI matrix and the later AAP runs are separate evidence sources. The AAP results and provenance limitations are summarized in [the paired evidence appendix](AAP_K8S_EVIDENCE_APPENDIX.md); neither set of runs measures production reliability.
+
+## Subsequent AAP integration
+
+Two completed, separately staged AAP Developer Sandbox workflows used a restricted HTTP-to-`kubectl` adapter against the same type of disposable Deployment. The unchecked path finished with 3 desired replicas after an externally injected change to 4; the guarded path retained 4 and recorded the adapter's `409` / `stale_precondition` event. These are **not extra cases from the six-case local matrix**; see [the sanitized AAP evidence appendix](AAP_K8S_EVIDENCE_APPENDIX.md) for chronology and qualifications.
 
 ## References
 

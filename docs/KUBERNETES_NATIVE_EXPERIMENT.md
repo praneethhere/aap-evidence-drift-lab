@@ -17,7 +17,7 @@ This is an applied engineering *demonstration*, not an assertion of a new algori
 | E ABA count-only | expected replicas 2 | 2 → 4 → 2 → count-guarded scale 3 | 3, applied | Matching current value does not imply unchanged history |
 | F ABA version | original resourceVersion | 2 → 4 → 2 → version-guarded scale 3 | 2, rejected | ResourceVersion can detect history changes masked by equal values |
 
-Expected observations are **not results** until confirmed by the user's real cluster run. Test AAP pair B/C separately with capture, approval, precheck, hold, and external change.
+The six cases have since been observed in the real disposable cluster (see [the results](KUBERNETES_NATIVE_RESULTS.md)). The two later AAP-orchestrated runs are **separate evidence** with their own capture, approval, precheck, hold and external change; see [the AAP appendix](AAP_K8S_EVIDENCE_APPENDIX.md). The table above remains the experimental design rather than an independent proof of each outcome.
 
 ## Core validity threats
 
