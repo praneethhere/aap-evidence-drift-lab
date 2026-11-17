@@ -1,0 +1,75 @@
+---
+- name: Probe a server-side resourceVersion precondition against isolated OpenShift Deployment
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Require exact, safe experiment inputs
+      ansible.builtin.assert:
+        that:
+          - ev_expected_resource_version is defined
+          - (ev_expected_resource_version | string | length) > 0
+          - ev_expected_uid is defined
+          - (ev_expected_uid | string | length) > 0
+          - ev_target_replicas is defined
+          - (ev_target_replicas | string) in ['0', '1']
+        fail_msg: 'STOP: missing/invalid conditional patch probe inputs'
+    - name: Read target identity without changing it
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        namespace: praneethhere-dev
+        name: edlab-approval-target
+      register: before
+      no_log: true
+    - name: Require the captured Deployment UID
+      ansible.builtin.assert:
+        that:
+          - before.resources | length == 1
+          - before.resources[0].metadata.uid == ev_expected_uid
+        fail_msg: 'STOP: target Deployment was replaced'
+    - name: Patch with Kubernetes-enforced version precondition
+      block:
+        - name: Submit conditional patch (not pre-read-only guard)
+          kubernetes.core.k8s:
+            state: patched
+            api_version: apps/v1
+            kind: Deployment
+            name: edlab-approval-target
+            namespace: praneethhere-dev
+            merge_type:
+              - merge
+            definition:
+              metadata:
+                resourceVersion: '{{ ev_expected_resource_version }}'
+              spec:
+                replicas: '{{ ev_target_replicas | int }}'
+          register: patch_result
+          no_log: true
+        - name: Independently read the final replicas and identity
+          kubernetes.core.k8s_info:
+            api_version: apps/v1
+            kind: Deployment
+            name: edlab-approval-target
+            namespace: praneethhere-dev
+          register: after
+          no_log: true
+        - name: Confirm applied state and correct object
+          ansible.builtin.assert:
+            that:
+              - after.resources | length == 1
+              - after.resources[0].metadata.uid == ev_expected_uid
+              - (after.resources[0].spec.replicas | int) == (ev_target_replicas | int)
+            fail_msg: 'STOP: patch task ended but final Deployment state did not match'
+        - name: Report applied result without revealing credentials
+          ansible.builtin.debug:
+            msg: AAP_NATIVE_CAS_APPLIED=PASS
+      rescue:
+        - name: Require an actual HTTP 409 conflict, not an authentication or infrastructure failure
+          ansible.builtin.assert:
+            that:
+              - "'409' in (ansible_failed_result.msg | default('') | string)"
+            fail_msg: 'AAP_NATIVE_CAS_UNEXPECTED_FAILURE (not a 409)'
+        - name: Preserve failed job status for expected stale precondition
+          ansible.builtin.fail:
+            msg: AAP_NATIVE_CAS_STALE_409=PASS
