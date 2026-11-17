@@ -1,0 +1,38 @@
+---
+- name: Verify native Kubernetes support in AAP
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Check installed kubernetes.core collection
+      ansible.builtin.command:
+        argv:
+          - ansible-galaxy
+          - collection
+          - list
+          - kubernetes.core
+      register: collection_probe
+      changed_when: false
+
+    - name: Require kubernetes.core collection
+      ansible.builtin.assert:
+        that:
+          - "'kubernetes.core' in collection_probe.stdout"
+        fail_msg: "kubernetes.core is missing from this execution environment"
+
+    - name: Check Kubernetes Python dependencies
+      ansible.builtin.command:
+        argv:
+          - "{{ ansible_playbook_python }}"
+          - -c
+          - "import kubernetes, yaml; print('K8S_PYTHON_IMPORT=PASS')"
+      register: python_probe
+      changed_when: false
+
+    - name: Report result
+      ansible.builtin.debug:
+        msg:
+          - "AAP_NATIVE_EE_CANARY=PASS"
+          - "{{ python_probe.stdout }}"
+          - "{{ collection_probe.stdout_lines | join(' | ') }}"
