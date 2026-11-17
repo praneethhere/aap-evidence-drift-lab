@@ -1,0 +1,95 @@
+---
+- name: Prove a stale resourceVersion fails safely inside AAP against a named OpenShift Deployment
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Require exact lab input
+      ansible.builtin.assert:
+        that:
+          - ev_expected_uid is defined
+          - ev_stale_resource_version is defined
+          - (ev_expected_uid | string | length) > 0
+          - (ev_stale_resource_version | string | length) > 0
+        fail_msg: 'STOP: missing lab identity or version input'
+
+    - name: Read isolated target just before conditional write
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        namespace: praneethhere-dev
+        name: edlab-approval-target
+      register: before
+      no_log: true
+
+    - name: Verify external change, UID and deliberately stale version
+      ansible.builtin.assert:
+        that:
+          - before.resources | length == 1
+          - before.resources[0].metadata.uid == ev_expected_uid
+          - (before.resources[0].spec.replicas | int) == 2
+          - (before.resources[0].metadata.resourceVersion | string) != (ev_stale_resource_version | string)
+        fail_msg: 'STOP: the target is not in the expected external-change state'
+
+    - name: Attempt one server-conditional write with the old resourceVersion
+      kubernetes.core.k8s:
+        state: patched
+        api_version: apps/v1
+        kind: Deployment
+        namespace: praneethhere-dev
+        name: edlab-approval-target
+        merge_type:
+          - merge
+        continue_on_error: true
+        definition:
+          metadata:
+            resourceVersion: "{{ ev_stale_resource_version | string }}"
+          spec:
+            replicas: 1
+      register: patch_probe
+      failed_when: false
+      no_log: true
+
+    - name: Compute nonsecret result categories internally
+      ansible.builtin.set_fact:
+        patch_raw: "{{ patch_probe | to_json }}"
+        patch_reported_error: "{{ (patch_probe.error is defined and patch_probe.error) or (patch_probe.failed | default(false) | bool) or (patch_probe.msg is defined and patch_probe.msg) }}"
+      no_log: true
+
+    - name: Classify error without exposing module response
+      ansible.builtin.set_fact:
+        conflict_409_text: "{{ '409' in patch_raw }}"
+        conflict_reason_text: "{{ 'Conflict' in patch_raw or 'conflict' in patch_raw or 'object has been modified' in patch_raw }}"
+      no_log: true
+
+    - name: Print only carefully bounded diagnostics
+      ansible.builtin.debug:
+        msg:
+          - "PATCH_REPORTED_ERROR={{ 'YES' if (patch_reported_error | bool) else 'NO' }}"
+          - "PATCH_HTTP_409_TEXT={{ 'YES' if (conflict_409_text | bool) else 'NO' }}"
+          - "PATCH_CONFLICT_TEXT={{ 'YES' if (conflict_reason_text | bool) else 'NO' }}"
+
+    - name: Independently verify original external state still holds
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        namespace: praneethhere-dev
+        name: edlab-approval-target
+      register: after
+      no_log: true
+
+    - name: Require genuine conflict report and preserved target
+      ansible.builtin.assert:
+        that:
+          - patch_reported_error | bool
+          - conflict_409_text | bool
+          - conflict_reason_text | bool
+          - after.resources | length == 1
+          - after.resources[0].metadata.uid == ev_expected_uid
+          - (after.resources[0].spec.replicas | int) == 2
+        fail_msg: 'W5A_STALE_CONFLICT=NOT_PROVEN (check sanitized categories and final state)'
+        success_msg: 'W5A_STALE_CONFLICT=PROVEN_BY_MODULE_AND_READBACK'
+
+    - name: Mark real conflict as failure for AAP workflow routing test
+      ansible.builtin.fail:
+        msg: 'AAP_NATIVE_STALE_CONFLICT=PASS (intentional failed job)'
