@@ -1,0 +1,94 @@
+---
+- name: Diagnose a fresh native conditional patch in AAP without leaking API errors
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Require exact target identity and safe input
+      ansible.builtin.assert:
+        that:
+          - ev_expected_uid is defined
+          - (ev_expected_uid | string | length) > 0
+          - ev_prelaunch_resource_version is defined
+          - (ev_prelaunch_resource_version | string | length) > 0
+        fail_msg: 'STOP: missing diagnostic identity inputs'
+
+    - name: Read current target in the executing job
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        namespace: praneethhere-dev
+        name: edlab-approval-target
+      register: before
+      no_log: true
+
+    - name: Require the original lab Deployment and zero baseline
+      ansible.builtin.assert:
+        that:
+          - before.resources | length == 1
+          - before.resources[0].metadata.uid == ev_expected_uid
+          - (before.resources[0].spec.replicas | int) == 0
+        fail_msg: 'STOP: target identity or zero baseline changed'
+
+    - name: Report whether launch-time version remained current by first job read
+      ansible.builtin.debug:
+        msg: "PRELAUNCH_RV_STILL_CURRENT={{ 'YES' if ((before.resources[0].metadata.resourceVersion | string) == (ev_prelaunch_resource_version | string)) else 'NO' }}"
+
+    - name: Patch with resourceVersion captured inside this job
+      kubernetes.core.k8s:
+        state: patched
+        api_version: apps/v1
+        kind: Deployment
+        namespace: praneethhere-dev
+        name: edlab-approval-target
+        merge_type:
+          - merge
+        continue_on_error: true
+        definition:
+          metadata:
+            resourceVersion: "{{ before.resources[0].metadata.resourceVersion | string }}"
+          spec:
+            replicas: 1
+      register: patch_probe
+      failed_when: false
+      no_log: true
+
+    - name: Collect error string internally without printing sensitive details
+      ansible.builtin.set_fact:
+        diagnostic_error: "{{ ((patch_probe.get('error', {}) or {}).get('msg') or patch_probe.get('msg') or '') | string }}"
+        diagnostic_reason: "{{ ((patch_probe.get('error', {}) or {}).get('reason') or patch_probe.get('reason') or '') | string }}"
+        diagnostic_failed: "{{ (patch_probe.failed | default(false) | bool) or (patch_probe.error is defined) }}"
+      no_log: true
+
+    - name: Report safe response categories only
+      ansible.builtin.debug:
+        msg:
+          - "PATCH_REPORTED_ERROR={{ 'YES' if diagnostic_failed | bool else 'NO' }}"
+          - "PATCH_HTTP_401={{ 'YES' if ('401' in diagnostic_error) else 'NO' }}"
+          - "PATCH_HTTP_403={{ 'YES' if ('403' in diagnostic_error) else 'NO' }}"
+          - "PATCH_HTTP_409_TEXT={{ 'YES' if ('409' in diagnostic_error) else 'NO' }}"
+          - "PATCH_REASON_CONFLICT={{ 'YES' if (diagnostic_reason | lower == 'conflict') else 'NO' }}"
+          - "PATCH_HTTP_422={{ 'YES' if ('422' in diagnostic_error) else 'NO' }}"
+          - "PATCH_FORBIDDEN={{ 'YES' if ('forbidden' in diagnostic_error | lower) else 'NO' }}"
+          - "PATCH_VALIDATION_ERROR={{ 'YES' if ('validation' in diagnostic_error | lower or 'unprocessable' in diagnostic_error | lower) else 'NO' }}"
+          - "PATCH_MODULE_ERROR={{ 'YES' if ('module' in diagnostic_error | lower or 'import' in diagnostic_error | lower) else 'NO' }}"
+          - "PATCH_ERROR_PRESENT={{ 'YES' if (diagnostic_error | length > 0) else 'NO' }}"
+
+    - name: Independently read target after patch attempt
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        namespace: praneethhere-dev
+        name: edlab-approval-target
+      register: after
+      no_log: true
+
+    - name: Require patch success and correct resulting replicas
+      ansible.builtin.assert:
+        that:
+          - not (diagnostic_failed | bool)
+          - after.resources | length == 1
+          - after.resources[0].metadata.uid == ev_expected_uid
+          - (after.resources[0].spec.replicas | int) == 1
+        fail_msg: 'AAP_W5A_REPROBE=FAIL (see safe categories above)'
+        success_msg: 'AAP_W5A_REPROBE=PASS (fresh in-job conditional patch applied)'
