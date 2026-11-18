@@ -1,0 +1,24 @@
+---
+- name: W5B independently verify second approval result
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Read target after second approved action
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        namespace: praneethhere-dev
+        name: edlab-repro-target
+      register: final_target
+      no_log: true
+
+    - name: Require change on newly approved premise
+      ansible.builtin.assert:
+        that:
+          - final_target.resources | length == 1
+          - final_target.resources[0].metadata.uid == ev2_uid
+          - (final_target.resources[0].spec.replicas | int) == 1
+          - (final_target.resources[0].metadata.generation | int) == ((ev2_gen | int) + 1)
+        fail_msg: 'W5B_VERIFY2=FAIL: re-approved result does not match premise'
+        success_msg: 'W5B_VERIFY2=PASS'

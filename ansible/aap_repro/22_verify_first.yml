@@ -1,0 +1,24 @@
+---
+- name: W5B independently verify first approved action
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Read target after first approved action
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        namespace: praneethhere-dev
+        name: edlab-repro-target
+      register: final_target
+      no_log: true
+
+    - name: Require approved change and expected generation transition
+      ansible.builtin.assert:
+        that:
+          - final_target.resources | length == 1
+          - final_target.resources[0].metadata.uid == ev1_uid
+          - (final_target.resources[0].spec.replicas | int) == 1
+          - (final_target.resources[0].metadata.generation | int) == ((ev1_gen | int) + 1)
+        fail_msg: 'W5B_VERIFY1=FAIL: approved premise/result mismatch'
+        success_msg: 'W5B_VERIFY1=PASS'

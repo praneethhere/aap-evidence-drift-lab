@@ -1,0 +1,47 @@
+---
+- name: W5B classify actual conflict and capture new approval evidence
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Require a proven native conflict from the failed action
+      ansible.builtin.assert:
+        that:
+          - ev1_native_conflict_409 | default(false) | bool
+          - ev1_conflict_uid == ev1_uid
+        fail_msg: 'STOP: failed action was not proven to be Kubernetes 409'
+
+    - name: Independently read changed target
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        namespace: praneethhere-dev
+        name: edlab-repro-target
+      register: changed_target
+      no_log: true
+
+    - name: Require same target but a changed premise
+      ansible.builtin.assert:
+        that:
+          - changed_target.resources | length == 1
+          - changed_target.resources[0].metadata.uid == ev1_uid
+          - (changed_target.resources[0].metadata.resourceVersion | string) != (ev1_rv | string)
+        fail_msg: 'STOP: target replaced or no revised evidence to approve'
+
+    - name: Export *new* evidence under unique keys
+      ansible.builtin.set_stats:
+        data:
+          ev2_uid: "{{ changed_target.resources[0].metadata.uid }}"
+          ev2_rv: "{{ changed_target.resources[0].metadata.resourceVersion | string }}"
+          ev2_gen: "{{ changed_target.resources[0].metadata.generation | int }}"
+          ev2_replicas: "{{ changed_target.resources[0].spec.replicas | int }}"
+          ev2_desired: 1
+        per_host: false
+
+    - name: Display exactly what needs new approval
+      ansible.builtin.debug:
+        msg:
+          - 'W5B_RECAPTURE=PASS'
+          - "Re-approve action from captured replicas={{ changed_target.resources[0].spec.replicas }} to desired=1"
+          - "New resourceVersion={{ changed_target.resources[0].metadata.resourceVersion }}"
+          - "New generation={{ changed_target.resources[0].metadata.generation }}"

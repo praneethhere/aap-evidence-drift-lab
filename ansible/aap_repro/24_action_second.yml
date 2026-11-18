@@ -1,0 +1,36 @@
+---
+- name: W5B enforce newly approved precondition
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Require new approval evidence from recapture
+      ansible.builtin.assert:
+        that:
+          - ev2_uid is defined
+          - ev2_rv is defined
+          - ev2_gen is defined
+          - ev2_replicas is defined
+          - (ev2_desired | int) == 1
+          - ev2_uid == ev1_uid
+        fail_msg: 'STOP: second approval is missing a fresh premise'
+
+    - name: Execute native conditional patch against new evidence
+      kubernetes.core.k8s:
+        state: patched
+        api_version: apps/v1
+        kind: Deployment
+        namespace: praneethhere-dev
+        name: edlab-repro-target
+        merge_type:
+          - merge
+        definition:
+          metadata:
+            resourceVersion: "{{ ev2_rv | string }}"
+          spec:
+            replicas: 1
+      no_log: true
+
+    - name: Report second conditional action submitted
+      ansible.builtin.debug:
+        msg: 'W5B_ACTION2_PATCH_APPLIED=YES (verify independently)'
