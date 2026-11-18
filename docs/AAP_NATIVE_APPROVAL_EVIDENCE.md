@@ -37,7 +37,11 @@ part of this workflow.
 8. **`25_verify_second`** runs the same read-back checks against the new evidence.
 
 As configured for these runs, the workflow had 8 nodes and 7 edges. Only
-`21_action_first` had a failure edge. The workflow definition is not published.
+`21_action_first` had a failure edge. A [sanitized topology](AAP_NATIVE_WORKFLOW_TOPOLOGY.json)
+provides the node identifiers, link conditions, and playbook mapping extracted
+from the experiment's local provisioning source. It is a **documentation artifact**,
+not an importable AAP template or a live controller export; credential configuration,
+workflow creation logic, and approver CLI remain unpublished.
 
 ## Recorded runs
 
@@ -102,8 +106,19 @@ version-checked `oc scale` command. The cleanup tooling is not published.
 
 ## Reproduction status
 
-These runs cannot yet be reproduced from public materials. The workflow
-definition, credential and RBAC setup, and the approval-evidence CLI are not
-published. The namespace and Deployment name are hard-coded in the playbooks.
-No second operator has reproduced the setup. Do not describe this as a
-one-command reproduction or as production-ready.
+These runs cannot yet be reproduced from public materials. Although the
+[workflow topology](AAP_NATIVE_WORKFLOW_TOPOLOGY.json) is now published, an
+importable controller template, credential and RBAC setup, and the
+approval-evidence CLI are not. The namespace and Deployment name are hard-coded
+in the playbooks. No second operator has reproduced the setup. Do not describe
+this as a one-command reproduction or as production-ready.
+
+## Terminology and source provenance
+
+The historical pinned commit message uses the shorthand *evidence-bound*. In
+this lab that describes a **version-conditional write based on previously
+captured evidence**, not evidence-bound authorization by the human approver.
+The source commit is retained unchanged because all 11 historical AAP execution
+job records identify that revision. The workflow was tested with temporary
+service-account credentials, but authorization to launch component job templates
+outside the approval workflow was not tested.

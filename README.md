@@ -4,6 +4,21 @@
 
 > **Question:** Can a successful approval, a passing precheck, and a successful final-state verifier coexist with an action that overwrites a newer infrastructure decision?
 
+## Technical talk companion: approval, freshness, and re-approval
+
+**Audience:** Platform engineers and automation architects using Red Hat Ansible Automation Platform (AAP) to execute *imperative* Kubernetes or Red Hat OpenShift changes after a human approval. Teams using GitOps reconciliation have a different change-delivery model; this lab does not compare the approaches.
+
+**Problem:** AAP's approval node pauses a workflow, not the target's state. The tested safeguard is an API-enforced `resourceVersion` precondition **on the write**. It does not cryptographically bind an approval to evidence or establish separation of duties.
+
+**Follow the technical evidence:**
+
+- [Six native AAP playbooks](ansible/aap_native/) — capture, conditional action, read-back, recapture, second action, and read-back.
+- [Sanitized eight-node workflow topology](docs/AAP_NATIVE_WORKFLOW_TOPOLOGY.json) — human-readable nodes, links, and playbook mapping; **not** an importable AAP template or complete installation.
+- [Three recorded runs and their limitations](docs/AAP_NATIVE_APPROVAL_EVIDENCE.md) — no-drift success (93), stale write followed by denial (99), stale write followed by a new approval (105).
+- [Earlier adapter-based comparison](docs/AAP_K8S_EVIDENCE_APPENDIX.md) — a separate setup; its HTTP 409 originated in the adapter, not the Kubernetes API server.
+
+**Status:** The native outcomes come from author-controlled lab runs and private consistency checks. Raw AAP records, credentials, a portable provisioner, and an independently replicated setup are **not** public. The published topology and playbooks document the design; they do not establish production readiness or approval-to-evidence binding. This repository is not affiliated with or endorsed by Red Hat.
+
 ## Native AAP/OpenShift approval experiment (November 2026)
 
 A second demonstration runs the Kubernetes calls **inside the AAP execution
@@ -34,8 +49,10 @@ independently from this repository.
 
 The workflow playbooks are `ansible/aap_native/20_capture.yml` through
 `25_verify_second.yml`. Files `00`–`06` in the same directory are earlier
-diagnostic probes. The AAP workflow definition, credential setup, and the helper
-that displayed evidence to the approver are **not** published.
+diagnostic probes. A [sanitized workflow topology](docs/AAP_NATIVE_WORKFLOW_TOPOLOGY.json)
+now documents the eight nodes and seven edges. An importable AAP template,
+credential setup, and the helper that displayed evidence to the approver are
+**not** published.
 
 **Limitations that matter most:**
 

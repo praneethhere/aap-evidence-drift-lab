@@ -1,6 +1,6 @@
 # AAP native Kubernetes lab: API-only execution protocol
 
-**Evidence status:** The native six-case matrix and two separate AAP-to-Kubernetes workflow runs **have been observed** in the disposable lab (November 2026); see [the sanitized evidence appendix](AAP_K8S_EVIDENCE_APPENDIX.md). These instructions remain a reproduction protocol, not a claim that every independent environment will behave identically. The commands below perform AAP REST API operations from the operator's own workstation (the original run used macOS). ChatGPT does not have private access to the AAP sandbox or the Mac cluster. Never share `AAP_TOKEN`, `EDLAB_TOKEN`, kubeconfig, tunnel credentials, or session cookies.
+**Evidence status:** The native six-case matrix and two separate AAP-to-Kubernetes workflow runs **have been observed** in the disposable lab (November 2026); see [the sanitized evidence appendix](AAP_K8S_EVIDENCE_APPENDIX.md). These instructions remain a reproduction protocol, not a claim that every independent environment will behave identically. The commands below perform AAP REST API operations from the operator's own workstation (the original run used macOS). Access to AAP and Kubernetes requires credentials and contexts configured by the operator. Never share `AAP_TOKEN`, `EDLAB_TOKEN`, kubeconfig, tunnel credentials, or session cookies.
 
 ## 1. Prepare a clean clone and the disposable cluster
 
@@ -37,7 +37,7 @@ Use the temporary **HTTPS** `.trycloudflare.com` origin shown in the terminal fo
 
 ## 4. Read-only AAP discovery (terminal C)
 
-Set the actual AAP *platform gateway origin*, e.g. `https://<your-aap-host>` with no `/api` path. Use an existing API token or create a scoped PAT through your own authenticated AAP account; never send a token to ChatGPT.
+Set the actual AAP *platform gateway origin*, e.g. `https://<your-aap-host>` with no `/api` path. Use an existing API token or create a scoped PAT through your own authenticated AAP account; do not paste or upload access tokens to chat systems, issue trackers, or public logs.
 
 ```sh
 cd /path/to/aap-evidence-drift-lab

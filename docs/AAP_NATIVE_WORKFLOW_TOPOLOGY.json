@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "title": "Native AAP/OpenShift approval lab \u2014 sanitized workflow topology",
+  "classification": "DOCUMENTATION_ONLY_NOT_IMPORTABLE",
+  "source_provenance": {
+    "graph_extracted_from": "local W5B orchestration script NODES and EDGES constants",
+    "tested_playbook_git_commit": "ac14dd54a57c39f8999217a6c982f01d49545c38",
+    "controller_graph_check": "Author-reported: 8 nodes / 7 edges in workflow runs 93, 99, 105",
+    "independent_reproduction": "NOT_PROVEN"
+  },
+  "nodes": [
+    {
+      "id": "capture",
+      "type": "job",
+      "playbook": "ansible/aap_native/20_capture.yml"
+    },
+    {
+      "id": "approve1",
+      "type": "approval",
+      "decision": "human approval/denial"
+    },
+    {
+      "id": "act1",
+      "type": "job",
+      "playbook": "ansible/aap_native/21_action_first.yml"
+    },
+    {
+      "id": "verify1",
+      "type": "job",
+      "playbook": "ansible/aap_native/22_verify_first.yml"
+    },
+    {
+      "id": "recapture",
+      "type": "job",
+      "playbook": "ansible/aap_native/23_recapture.yml"
+    },
+    {
+      "id": "approve2",
+      "type": "approval",
+      "decision": "human approval/denial"
+    },
+    {
+      "id": "act2",
+      "type": "job",
+      "playbook": "ansible/aap_native/24_action_second.yml"
+    },
+    {
+      "id": "verify2",
+      "type": "job",
+      "playbook": "ansible/aap_native/25_verify_second.yml"
+    }
+  ],
+  "edges": [
+    {
+      "from": "capture",
+      "to": "approve1",
+      "on": "success"
+    },
+    {
+      "from": "approve1",
+      "to": "act1",
+      "on": "success"
+    },
+    {
+      "from": "act1",
+      "to": "verify1",
+      "on": "success"
+    },
+    {
+      "from": "act1",
+      "to": "recapture",
+      "on": "failure"
+    },
+    {
+      "from": "recapture",
+      "to": "approve2",
+      "on": "success"
+    },
+    {
+      "from": "approve2",
+      "to": "act2",
+      "on": "success"
+    },
+    {
+      "from": "act2",
+      "to": "verify2",
+      "on": "success"
+    }
+  ],
+  "limitations": [
+    "This describes workflow topology, not an importable AWX/AAP export or reusable controller provisioner.",
+    "No controller object IDs, cluster endpoints, credentials, roles, tokens or inventory are included.",
+    "The approval nodes do not cryptographically bind approval to resourceVersion or evidence display.",
+    "Approval 2 denial has no success or always bypass, and action 2 has no recapture-on-failure path.",
+    "The run used separate reader/writer credentials, configuration not included.",
+    "The fixed playbooks reference a personal research namespace and Deployment."
+  ]
+}
