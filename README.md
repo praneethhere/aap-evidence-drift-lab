@@ -1,5 +1,7 @@
 # Evidence Drift Lab
 
+> **Red Hat Summit 2027 reviewer shortcut:** [Explore three author-reported native AAP/OpenShift lab runs](docs/SUMMIT_2027_TWO_MINUTE_GUIDE.md) — no drift, stale write followed by denial, and stale write followed by reapproval. The public documentation summarizes these outcomes; raw AAP job records remain private. The later W5K series is separate and unpublished.
+
 **An engineering lab for stale decisions in approved automation.** It examines the gap between an approval/precheck and the eventual mutation of a target system. The primary demonstration uses **real Kubernetes desired-replica updates** orchestrated through Red Hat Ansible Automation Platform (AAP) workflows. The local `kind` matrix is reproducible from this repository; the AAP experiments are recorded lab runs whose AAP-side setup is only partly published. An earlier, intentionally synthetic Python/SQLite target remains available for comparison.
 
 > **Question:** Can a successful approval, a passing precheck, and a successful final-state verifier coexist with an action that overwrites a newer infrastructure decision?
