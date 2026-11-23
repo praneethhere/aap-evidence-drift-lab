@@ -1,6 +1,13 @@
 # Evidence Drift Lab
 
-> **Red Hat Summit 2027 reviewer shortcut:** [Explore three author-reported native AAP/OpenShift lab runs](docs/SUMMIT_2027_TWO_MINUTE_GUIDE.md) — no drift, stale write followed by denial, and stale write followed by reapproval. The public documentation summarizes these outcomes; raw AAP job records remain private. The later W5K series is separate and unpublished.
+<!-- summit-2027-evidence-navigation -->
+### Red Hat Summit 2027 evidence navigator
+
+For the proposed AAP approval-routing talk, start with the [experiment evidence matrix](docs/SUMMIT_2027_EVIDENCE_MATRIX.md). It separates [native AAP workflow runs](docs/AAP_NATIVE_APPROVAL_EVIDENCE.md) (author-reported, OpenShift-targeted lab configuration) from the earlier adapter comparison and the [standalone kind Kubernetes controls](experiments/kind-drift-control/). These series should not be treated as one experiment. The AAP job exports and effective runtime endpoint are not publicly attested.
+<!-- end summit-2027-evidence-navigation -->
+
+
+> **Red Hat Summit 2027 reviewer shortcut:** [Explore three author-reported native AAP/OpenShift lab runs](docs/SUMMIT_2027_TWO_MINUTE_GUIDE.md) — no drift, stale write followed by denial, and stale write followed by reapproval. The public documentation summarizes these outcomes; raw AAP job records remain private. The later W5K exploratory series is separate from jobs 93/99/105 and is not used as evidence for this Summit proposal. Public source visibility and private experiment records are distinct.
 
 **An engineering lab for stale decisions in approved automation.** It examines the gap between an approval/precheck and the eventual mutation of a target system. The primary demonstration uses **real Kubernetes desired-replica updates** orchestrated through Red Hat Ansible Automation Platform (AAP) workflows. The local `kind` matrix is reproducible from this repository; the AAP experiments are recorded lab runs whose AAP-side setup is only partly published. An earlier, intentionally synthetic Python/SQLite target remains available for comparison.
 
