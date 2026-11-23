@@ -1,0 +1,143 @@
+name: Summit 2027 Ansible kind four-case reproduction
+
+# Deliberately manual-only. Never triggered by a PR or a branch push.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  four-case-kind:
+    name: Independent-runner local-kind control (not AAP)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      KUBECONFIG: ${{ runner.temp }}/summit-kind-kubeconfig
+    steps:
+      - name: Checkout exactly this repository revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Isolate and install Python dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/summit-venv"
+          echo "$RUNNER_TEMP/summit-venv/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/summit-venv/bin/python" -m pip install --disable-pip-version-check --no-cache-dir \
+            'ansible-core==2.18.10' 'kubernetes==37.0.1' \
+            'PyYAML==6.0.2' 'Jinja2==3.1.6' 'jsonpatch==1.33'
+
+      - name: Check published source hashes and offline tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd experiments/ansible-scale-routing-ab
+          sha256sum -c SHA256SUMS
+          python3 -m unittest discover -s source/tests -v
+
+      - name: Install verified kind v0.33.0 and kubectl v1.37.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/summit-bin"
+          cd "$RUNNER_TEMP/summit-bin"
+          curl --fail --location --silent --show-error --retry 3 \
+            -o kind-linux-amd64 https://kind.sigs.k8s.io/dl/v0.33.0/kind-linux-amd64
+          curl --fail --location --silent --show-error --retry 3 \
+            -o kind-linux-amd64.sha256sum https://kind.sigs.k8s.io/dl/v0.33.0/kind-linux-amd64.sha256sum
+          sha256sum --check kind-linux-amd64.sha256sum
+          install -m 0755 kind-linux-amd64 "$RUNNER_TEMP/summit-bin/kind"
+          curl --fail --location --silent --show-error --retry 3 \
+            -o kubectl https://dl.k8s.io/release/v1.37.0/bin/linux/amd64/kubectl
+          curl --fail --location --silent --show-error --retry 3 \
+            -o kubectl.sha256 https://dl.k8s.io/release/v1.37.0/bin/linux/amd64/kubectl.sha256
+          echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check -
+          install -m 0755 kubectl "$RUNNER_TEMP/summit-bin/kubectl"
+          echo "$RUNNER_TEMP/summit-bin" >> "$GITHUB_PATH"
+          export PATH="$RUNNER_TEMP/summit-bin:$PATH"
+          kind version
+          kubectl version --client=true
+
+      - name: Create isolated, digest-pinned local kind cluster
+        shell: bash
+        run: |
+          set -euo pipefail
+          kind create cluster --name summit-drift \
+            --image 'kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5' \
+            --wait 180s
+          kubectl --context kind-summit-drift get nodes -o name
+
+      - name: Verify environment and prepare separately pinned Ansible collection
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd experiments/ansible-scale-routing-ab/source
+          python3 routing_ab.py preflight
+          python3 routing_ab.py prepare --collections "$RUNNER_TEMP/summit-collections"
+
+      - name: Run actual four-case experiment; expose only allowlisted summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd experiments/ansible-scale-routing-ab/source
+          private_log="$RUNNER_TEMP/summit-raw-private.log"
+          if python3 routing_ab.py run \
+              --collections "$RUNNER_TEMP/summit-collections" \
+              --output "$RUNNER_TEMP/summit-private-results" \
+              --confirm 'RUN ISOLATED KIND A/B' > "$private_log" 2>&1; then
+            runner_exit=0
+          else
+            runner_exit=$?
+          fi
+          python3 - "$private_log" "$runner_exit" <<'PY'
+          import pathlib, re, sys
+          raw = pathlib.Path(sys.argv[1]).read_text(errors='replace')
+          exit_code = int(sys.argv[2])
+          cases = [
+              ('scale-fresh', 0, 1),
+              ('patch-fresh', 0, 1),
+              ('scale-stale', 0, 2),
+              ('patch-stale', 2, 2),
+          ]
+          lines = []
+          ok = exit_code == 0 and raw.count('AB_EXPERIMENT_VERDICT=PASS') == 1
+          for name, expected_exit, expected_replicas in cases:
+              pattern = (rf'^CASE={name} RESULT=PASS ANSIBLE_EXIT={expected_exit} '
+                         rf'FINAL_REPLICAS={expected_replicas}$')
+              matches = re.findall(pattern, raw, re.MULTILINE)
+              case_ok = len(matches) == 1
+              ok = ok and case_ok
+              lines.append((name, expected_exit, expected_replicas, case_ok))
+          print('CI_SCOPE=GITHUB_HOSTED_KIND_NOT_AAP')
+          print('CI_SOURCE_COMMIT=' + __import__('os').environ.get('GITHUB_SHA', 'UNKNOWN'))
+          for name, code, replicas, case_ok in lines:
+              print(f'CI_CASE={name} EXPECTED_ANSIBLE_EXIT={code} '
+                    f'EXPECTED_REPLICAS={replicas} MATCH=' + ('YES' if case_ok else 'NO'))
+          print('CI_REPLICATION_VERDICT=' + ('PASS' if ok else 'INCOMPLETE'))
+          path = pathlib.Path(__import__('os').environ['GITHUB_STEP_SUMMARY'])
+          with path.open('a') as f:
+              f.write('## Red Hat Summit — independent GitHub-hosted runner execution\n\n')
+              f.write('**Not an AAP/OpenShift experiment or independent human review.** '
+                      'The workflow executes the repository-authored harness on a fresh '
+                      'GitHub-hosted kind cluster. Raw Ansible logs are not published.\n\n')
+              f.write('| Case | Expected Ansible exit | Expected final replicas | Match |\n')
+              f.write('|---|---:|---:|---|\n')
+              for name, code, replicas, case_ok in lines:
+                  f.write(f'| `{name}` | {code} | {replicas} | '
+                          f'{"PASS" if case_ok else "INCOMPLETE"} |\n')
+              f.write('\n**Verdict:** ' + ('PASS' if ok else 'INCOMPLETE') + '\n')
+              f.write('\n**Commit:** `' + __import__('os').environ.get('GITHUB_SHA', 'UNKNOWN') + '`\n')
+          if not ok:
+              sys.exit(2)
+          PY
+
+      - name: Remove workflow-owned kind cluster
+        if: always()
+        shell: bash
+        run: |
+          if command -v kind >/dev/null 2>&1; then
+            kind delete cluster --name summit-drift
+          fi
