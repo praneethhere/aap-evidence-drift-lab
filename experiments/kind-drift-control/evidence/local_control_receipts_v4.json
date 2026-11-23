@@ -1,0 +1,117 @@
+{
+  "schema_version": 2,
+  "scope": "Kubernetes API control experiment, not AAP reproduction",
+  "epistemic_status": "local-run-observations-not-independently-reproduced",
+  "run_status": "PASS",
+  "namespace_created": true,
+  "run_time_utc": "2026-11-23T02:13:32.026466+00:00",
+  "cluster_scope": {
+    "context": "kind-summit-drift",
+    "server_scope": "verified-local-kind-loopback",
+    "kind_cluster": "summit-drift"
+  },
+  "namespace": "summit-drift-public-20261123021329-cee3e",
+  "cases": [
+    {
+      "case": "guarded-no-drift",
+      "captured_state": {
+        "uid": "753e1113-f5ee-4553-a96b-9bc6a16a2b0f",
+        "resourceVersion": "24582",
+        "generation": 1,
+        "desired_replicas": 0
+      },
+      "intervening_state": null,
+      "intervening_patch_http_status": null,
+      "patch_http_status": 200,
+      "patch_reason": null,
+      "after_state": {
+        "uid": "753e1113-f5ee-4553-a96b-9bc6a16a2b0f",
+        "resourceVersion": "24583",
+        "generation": 2,
+        "desired_replicas": 1
+      },
+      "expected": "HTTP 200 and desired_replicas 1"
+    },
+    {
+      "case": "unguarded-after-drift",
+      "captured_state": {
+        "uid": "a11dea37-169b-4adb-bfbe-6bebcbf58029",
+        "resourceVersion": "24596",
+        "generation": 1,
+        "desired_replicas": 0
+      },
+      "intervening_state": {
+        "uid": "a11dea37-169b-4adb-bfbe-6bebcbf58029",
+        "resourceVersion": "24602",
+        "generation": 2,
+        "desired_replicas": 2
+      },
+      "intervening_patch_http_status": 200,
+      "patch_http_status": 200,
+      "patch_reason": null,
+      "after_state": {
+        "uid": "a11dea37-169b-4adb-bfbe-6bebcbf58029",
+        "resourceVersion": "24610",
+        "generation": 3,
+        "desired_replicas": 1
+      },
+      "expected": "HTTP 200 and desired_replicas 1 (unguarded overwrite)"
+    },
+    {
+      "case": "guarded-after-drift",
+      "captured_state": {
+        "uid": "71280e22-5b42-41fd-a879-9941b301bedd",
+        "resourceVersion": "24629",
+        "generation": 1,
+        "desired_replicas": 0
+      },
+      "intervening_state": {
+        "uid": "71280e22-5b42-41fd-a879-9941b301bedd",
+        "resourceVersion": "24633",
+        "generation": 2,
+        "desired_replicas": 2
+      },
+      "intervening_patch_http_status": 200,
+      "patch_http_status": 409,
+      "patch_reason": "Conflict",
+      "after_state": {
+        "uid": "71280e22-5b42-41fd-a879-9941b301bedd",
+        "resourceVersion": "24633",
+        "generation": 2,
+        "desired_replicas": 2
+      },
+      "expected": "HTTP 409 and desired_replicas remain 2"
+    },
+    {
+      "case": "recapture-fresh-guarded-write",
+      "captured_state": {
+        "uid": "71280e22-5b42-41fd-a879-9941b301bedd",
+        "resourceVersion": "24678",
+        "generation": 2,
+        "desired_replicas": 2
+      },
+      "intervening_state": null,
+      "intervening_patch_http_status": null,
+      "patch_http_status": 200,
+      "patch_reason": null,
+      "after_state": {
+        "uid": "71280e22-5b42-41fd-a879-9941b301bedd",
+        "resourceVersion": "24686",
+        "generation": 3,
+        "desired_replicas": 1
+      },
+      "expected": "HTTP 200 and desired_replicas 1",
+      "version_stabilization": {
+        "polls": 9,
+        "rv_changes_seen": 2,
+        "quiet_seconds_required": 1.5
+      }
+    }
+  ],
+  "limits": [
+    "No AAP workflow or approval nodes were executed.",
+    "Desired replicas only; not pod readiness or durability.",
+    "Different Deployments represent independent cases; Kubernetes background controllers can modify resourceVersion.",
+    "Results are locally observed; independent repetition requires another operator."
+  ]
+}
