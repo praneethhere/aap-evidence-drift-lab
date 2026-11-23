@@ -12,9 +12,12 @@ jobs:
     name: Independent-runner local-kind control (not AAP)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    env:
-      KUBECONFIG: ${{ runner.temp }}/summit-kind-kubeconfig
     steps:
+      - name: Set isolated kubeconfig path on runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'KUBECONFIG=%s/summit-kind-kubeconfig\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Checkout exactly this repository revision
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
