@@ -1,0 +1,62 @@
+---
+- name: W5C observe real AAP k8s_scale behavior after an approval pause
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Require approval-time snapshot from the existing W5B capture job
+      ansible.builtin.assert:
+        that:
+          - ev1_uid is defined
+          - ev1_rv is defined
+          - ev1_gen is defined
+          - ev1_replicas is defined
+          - ev1_desired is defined
+          - ev1_namespace is defined
+          - ev1_name is defined
+          - (ev1_replicas | int) == 0
+          - (ev1_desired | int) == 1
+          - ev1_namespace == 'praneethhere-dev'
+          - ev1_name == 'edlab-approval-target'
+        fail_msg: 'W5C_STOP: approval snapshot missing or wrong target'
+
+    - name: Read target identity without testing the stale version
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: edlab-approval-target
+        namespace: praneethhere-dev
+      register: action_target
+      no_log: true
+
+    - name: Refuse a replaced or nonresearch Deployment
+      ansible.builtin.assert:
+        that:
+          - action_target.resources | length == 1
+          - action_target.resources[0].metadata.uid == ev1_uid
+          - action_target.resources[0].metadata.labels.research == 'aap-approval-lab'
+        fail_msg: 'W5C_STOP: target identity/label changed; refusing to scale'
+
+    - name: Run the approved scale against the captured resourceVersion
+      kubernetes.core.k8s_scale:
+        api_version: apps/v1
+        kind: Deployment
+        name: edlab-approval-target
+        namespace: praneethhere-dev
+        replicas: "{{ ev1_desired | int }}"
+        resource_version: "{{ ev1_rv | string }}"
+        wait: false
+      register: scale_result
+      # Only the deliberately isolated test Deployment is targeted.
+      # Do not enable no_log here: the AAP task status and module warning
+      # are evidence. Verify the target contains no sensitive metadata first.
+
+    - name: Record what Ansible actually reported, without asserting the outcome
+      ansible.builtin.set_stats:
+        data:
+          ev1_scale_reported_changed: "{{ scale_result.changed | bool }}"
+        per_host: false
+
+    - name: Print a minimal observation, not a success-of-change assertion
+      ansible.builtin.debug:
+        msg: "W5C_SCALE_TASK_RETURNED=SUCCESS changed={{ scale_result.changed | bool }} desired=1 (postcondition NOT verified here)"
