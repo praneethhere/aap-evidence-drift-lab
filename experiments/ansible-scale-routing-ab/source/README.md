@@ -45,4 +45,3 @@ The explicit run creates a fresh run-owned namespace, stages four deployments, t
 The output is evidence of *local Ansible task behavior against kind*, **not** a live Red Hat Ansible Automation Platform failure edge. It is one author-run experiment on Kubernetes v1.37.0 unless a different version is detected and reported. Neither AAP approval binding nor independent third-party replication is established. An API-level conflict proves this single write's `resourceVersion` was stale; it does not establish a software defect or prevent all TOCTOU hazards.
 
 The source scope, namespace safeguards, clean-up limitations and stop conditions are inherited from the original V1. The original V1 run and separate diagnostic are documented in the parent `REVIEWER_README.md`; their private logs and original package are not included here.
-
