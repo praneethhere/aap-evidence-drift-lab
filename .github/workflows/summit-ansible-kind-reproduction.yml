@@ -31,7 +31,7 @@ jobs:
           echo "$RUNNER_TEMP/summit-venv/bin" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/summit-venv/bin/python" -m pip install --disable-pip-version-check --no-cache-dir \
             'ansible-core==2.18.10' 'kubernetes==37.0.1' \
-            'PyYAML==6.0.2' 'Jinja2==3.1.6' 'jsonpatch==1.33'
+            'PyYAML==6.0.3' 'Jinja2==3.1.6' 'jsonpatch==1.33'
 
       - name: Check published source hashes and offline tests
         shell: bash
