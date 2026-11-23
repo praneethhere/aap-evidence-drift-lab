@@ -1,0 +1,57 @@
+{
+  "AAP_executed": false,
+  "OpenShift_executed": false,
+  "cases": [
+    {
+      "ansible_exit_code": 0,
+      "case": "scale-fresh",
+      "final_desired_replicas": 1,
+      "outcome": "PASS",
+      "same_deployment_uid": true,
+      "task_signature_verified": true
+    },
+    {
+      "ansible_exit_code": 0,
+      "case": "patch-fresh",
+      "final_desired_replicas": 1,
+      "outcome": "PASS",
+      "same_deployment_uid": true,
+      "task_signature_verified": true
+    },
+    {
+      "ansible_exit_code": 0,
+      "case": "scale-stale",
+      "final_desired_replicas": 2,
+      "outcome": "PASS",
+      "same_deployment_uid": true,
+      "task_signature_verified": true
+    },
+    {
+      "ansible_exit_code": 2,
+      "case": "patch-stale",
+      "final_desired_replicas": 2,
+      "outcome": "PASS",
+      "same_deployment_uid": true,
+      "task_signature_verified": true
+    }
+  ],
+  "collection": "kubernetes.core",
+  "collection_version": "6.4.0",
+  "evidence_class": "AUTHOR_RUN_LOCAL_KIND_CONTROL",
+  "k8s_scale_source_sha256": "001e5658019f941defeedb7b876205f98605100d84e2cb8b0f61992a13332502",
+  "kubernetes_version": "v1.37.0",
+  "limitations": [
+    "Author-run local kind experiment only, not independently reproduced",
+    "Raw private logs and resource versions not published",
+    "No native AAP workflow, approval node, or failure-edge execution in this experiment",
+    "No OpenShift use or production validity demonstrated",
+    "No general race-freedom or TOCTOU immunity demonstrated",
+    "Final replicas refer to desired spec; deployment readiness was not tested",
+    "Namespace deletion requested, completion not verified"
+  ],
+  "namespace_cleanup": "DELETE_REQUESTED_NOT_CONFIRMED",
+  "publication_status": "PUBLIC_AUTHOR_REPORTED_NOT_INDEPENDENTLY_REPRODUCED",
+  "raw_private_receipt_sha256": "919f0dd1df7213dfde4a967bfb8c92a1cfeab9491ad759ac8d9c458e726a9dd6",
+  "schema_version": "summit-scale-routing-ab-public-author-reported-v1",
+  "source_runner_sha256": "716b7623a05426cef550e591a8f9008a5a579c138ffd4d29f705ffcb28f6817a"
+}
