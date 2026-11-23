@@ -58,7 +58,7 @@ jobs:
           curl --fail --location --silent --show-error --retry 3 \
             -o kubectl.sha256 https://dl.k8s.io/release/v1.37.0/bin/linux/amd64/kubectl.sha256
           echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check -
-          install -m 0755 kubectl "$RUNNER_TEMP/summit-bin/kubectl"
+          chmod 0755 kubectl
           echo "$RUNNER_TEMP/summit-bin" >> "$GITHUB_PATH"
           export PATH="$RUNNER_TEMP/summit-bin:$PATH"
           kind version
