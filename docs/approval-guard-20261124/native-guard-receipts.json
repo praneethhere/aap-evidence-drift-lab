@@ -1,0 +1,308 @@
+{
+  "cases": [
+    {
+      "action_receipt": {
+        "changed": true,
+        "failed": false,
+        "generic_invalid": false,
+        "http_status": null
+      },
+      "action_status": "successful",
+      "approval_actor": "experiment operator (author-reported)",
+      "approval_status": "successful",
+      "capture_ansible_core": "2.16.19",
+      "capture_collection": "6.4.0",
+      "capture_module_sha256": "a5170d05f1ab111fa2a355fb705af5a3ef76f98e97f760dcfc0ec176ceec0183",
+      "capture_status": "successful",
+      "case": "a",
+      "guard": "policy-aware",
+      "outcome": "APPLIED",
+      "patch": [
+        {
+          "op": "test",
+          "path": "/metadata/uid",
+          "value": "deployment-a"
+        },
+        {
+          "op": "test",
+          "path": "/spec/replicas",
+          "value": 0
+        },
+        {
+          "op": "test",
+          "path": "/metadata/generation",
+          "value": 1
+        },
+        {
+          "op": "test",
+          "path": "/metadata/labels/approval-tier",
+          "value": "standard"
+        },
+        {
+          "op": "replace",
+          "path": "/spec/replicas",
+          "value": 1
+        }
+      ],
+      "source_revision": "2115d1275e970389560682e19adc1104abde92f5",
+      "states": [
+        {
+          "approval_tier": "standard",
+          "generation": 1,
+          "replicas": 0,
+          "resourceVersion": "rv-1",
+          "spec_equivalence": "spec-1",
+          "stage": "capture",
+          "uid": "deployment-a"
+        },
+        {
+          "approval_tier": "standard",
+          "generation": 1,
+          "replicas": 0,
+          "resourceVersion": "rv-1",
+          "spec_equivalence": "spec-1",
+          "stage": "before_drift",
+          "uid": "deployment-a"
+        },
+        {
+          "approval_tier": "standard",
+          "generation": 1,
+          "replicas": 0,
+          "resourceVersion": "rv-1",
+          "spec_equivalence": "spec-1",
+          "stage": "before_approval",
+          "uid": "deployment-a"
+        },
+        {
+          "approval_tier": "standard",
+          "generation": 1,
+          "replicas": 0,
+          "resourceVersion": "rv-1",
+          "spec_equivalence": "spec-1",
+          "stage": "pre_attempt",
+          "uid": "deployment-a"
+        },
+        {
+          "approval_tier": "standard",
+          "generation": 2,
+          "replicas": 1,
+          "resourceVersion": "rv-2",
+          "spec_equivalence": "spec-2",
+          "stage": "post_action",
+          "uid": "deployment-a"
+        }
+      ],
+      "verdict": "CORRECT_ACCEPTANCE",
+      "workflow_status": "successful"
+    },
+    {
+      "action_receipt": {
+        "changed": true,
+        "failed": false,
+        "generic_invalid": false,
+        "http_status": null
+      },
+      "action_status": "successful",
+      "approval_actor": "experiment operator (author-reported)",
+      "approval_status": "successful",
+      "capture_ansible_core": "2.16.19",
+      "capture_collection": "6.4.0",
+      "capture_module_sha256": "a5170d05f1ab111fa2a355fb705af5a3ef76f98e97f760dcfc0ec176ceec0183",
+      "capture_status": "successful",
+      "case": "b",
+      "guard": "policy-aware",
+      "outcome": "APPLIED",
+      "patch": [
+        {
+          "op": "test",
+          "path": "/metadata/uid",
+          "value": "deployment-b"
+        },
+        {
+          "op": "test",
+          "path": "/spec/replicas",
+          "value": 0
+        },
+        {
+          "op": "test",
+          "path": "/metadata/generation",
+          "value": 1
+        },
+        {
+          "op": "test",
+          "path": "/metadata/labels/approval-tier",
+          "value": "standard"
+        },
+        {
+          "op": "replace",
+          "path": "/spec/replicas",
+          "value": 1
+        }
+      ],
+      "source_revision": "2115d1275e970389560682e19adc1104abde92f5",
+      "states": [
+        {
+          "approval_tier": "standard",
+          "generation": 1,
+          "replicas": 0,
+          "resourceVersion": "rv-1",
+          "spec_equivalence": "spec-1",
+          "stage": "capture",
+          "uid": "deployment-b"
+        },
+        {
+          "approval_tier": "standard",
+          "generation": 1,
+          "replicas": 0,
+          "resourceVersion": "rv-1",
+          "spec_equivalence": "spec-1",
+          "stage": "before_drift",
+          "uid": "deployment-b"
+        },
+        {
+          "approval_tier": "restricted",
+          "generation": 1,
+          "replicas": 0,
+          "resourceVersion": "rv-2",
+          "spec_equivalence": "spec-1",
+          "stage": "intermediate",
+          "uid": "deployment-b"
+        },
+        {
+          "approval_tier": "standard",
+          "generation": 1,
+          "replicas": 0,
+          "resourceVersion": "rv-3",
+          "spec_equivalence": "spec-1",
+          "stage": "before_approval",
+          "uid": "deployment-b"
+        },
+        {
+          "approval_tier": "standard",
+          "generation": 1,
+          "replicas": 0,
+          "resourceVersion": "rv-3",
+          "spec_equivalence": "spec-1",
+          "stage": "pre_attempt",
+          "uid": "deployment-b"
+        },
+        {
+          "approval_tier": "standard",
+          "generation": 2,
+          "replicas": 1,
+          "resourceVersion": "rv-4",
+          "spec_equivalence": "spec-2",
+          "stage": "post_action",
+          "uid": "deployment-b"
+        }
+      ],
+      "verdict": "FALSE_ACCEPTANCE_UNDER_SYNTHETIC_POLICY",
+      "workflow_status": "successful"
+    },
+    {
+      "action_receipt": {
+        "changed": false,
+        "failed": true,
+        "generic_invalid": true,
+        "http_status": 422
+      },
+      "action_status": "failed",
+      "approval_actor": "experiment operator (author-reported)",
+      "approval_status": "successful",
+      "capture_ansible_core": "2.16.19",
+      "capture_collection": "6.4.0",
+      "capture_module_sha256": "a5170d05f1ab111fa2a355fb705af5a3ef76f98e97f760dcfc0ec176ceec0183",
+      "capture_status": "successful",
+      "case": "c",
+      "guard": "whole-version",
+      "outcome": "NOT_APPLIED_422",
+      "patch": [
+        {
+          "op": "test",
+          "path": "/metadata/uid",
+          "value": "deployment-c"
+        },
+        {
+          "op": "test",
+          "path": "/metadata/resourceVersion",
+          "value": "rv-1"
+        },
+        {
+          "op": "replace",
+          "path": "/spec/replicas",
+          "value": 1
+        }
+      ],
+      "source_revision": "2115d1275e970389560682e19adc1104abde92f5",
+      "states": [
+        {
+          "approval_tier": "standard",
+          "generation": 1,
+          "replicas": 0,
+          "resourceVersion": "rv-1",
+          "spec_equivalence": "spec-1",
+          "stage": "capture",
+          "uid": "deployment-c"
+        },
+        {
+          "approval_tier": "standard",
+          "generation": 1,
+          "replicas": 0,
+          "resourceVersion": "rv-1",
+          "spec_equivalence": "spec-1",
+          "stage": "before_drift",
+          "uid": "deployment-c"
+        },
+        {
+          "approval_tier": "restricted",
+          "generation": 1,
+          "replicas": 0,
+          "resourceVersion": "rv-2",
+          "spec_equivalence": "spec-1",
+          "stage": "intermediate",
+          "uid": "deployment-c"
+        },
+        {
+          "approval_tier": "standard",
+          "generation": 1,
+          "replicas": 0,
+          "resourceVersion": "rv-3",
+          "spec_equivalence": "spec-1",
+          "stage": "before_approval",
+          "uid": "deployment-c"
+        },
+        {
+          "approval_tier": "standard",
+          "generation": 1,
+          "replicas": 0,
+          "resourceVersion": "rv-3",
+          "spec_equivalence": "spec-1",
+          "stage": "pre_attempt",
+          "uid": "deployment-c"
+        },
+        {
+          "approval_tier": "standard",
+          "generation": 1,
+          "replicas": 0,
+          "resourceVersion": "rv-3",
+          "spec_equivalence": "spec-1",
+          "stage": "post_action",
+          "uid": "deployment-c"
+        }
+      ],
+      "verdict": "CORRECT_REJECTION_UNDER_SYNTHETIC_POLICY",
+      "workflow_status": "failed"
+    }
+  ],
+  "limits": [
+    "The action receipt records the constructed patch, not captured HTTP wire bytes.",
+    "HTTP 422 is not uniquely a test mismatch.",
+    "Spec equality and controller/source linkage are auditor assertions over private inputs; omitted fields cannot be independently rechecked from this projection.",
+    "The operator intentionally authorized B/C despite observed drift; no automatic AAP policy decision or production incident is claimed."
+  ],
+  "original_v1_manifest_entries_verified": 11,
+  "policy": "Any intervening approval-tier transition invalidates the captured premise; synthetic policy, not AAP default.",
+  "provenance": "Author-operated experiment; offline audit of author-retained controller artifacts and readbacks; not signed controller exports or independent reproduction.",
+  "redaction": "UID and resourceVersion replaced with per-case equality-preserving aliases; full specs represented by per-case equivalence IDs. Controller IDs, timestamps, paths, labels other than approval-tier, annotations and identities omitted.",
+  "schema": "native-aap-guard-redacted-v1"
+}

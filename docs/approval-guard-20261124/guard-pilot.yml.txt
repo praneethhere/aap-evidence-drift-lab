@@ -1,0 +1,106 @@
+name: Approval guard pilot
+on:
+  push:
+    branches: [main]
+    paths:
+      - summit_approval_guard_pilot.py
+      - .github/workflows/guard-pilot.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pilot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14.4'
+      - name: Install pinned tools and collection
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/guard-tools" "$RUNNER_TEMP/collections"
+          cd "$RUNNER_TEMP/guard-tools"
+          curl -fsSLO https://github.com/kubernetes-sigs/kind/releases/download/v0.33.0/kind-linux-amd64
+          curl -fsSLO https://github.com/kubernetes-sigs/kind/releases/download/v0.33.0/kind-linux-amd64.sha256sum
+          sha256sum -c kind-linux-amd64.sha256sum
+          mv kind-linux-amd64 kind
+          curl -fsSLo kubectl https://dl.k8s.io/release/v1.36.0/bin/linux/amd64/kubectl
+          curl -fsSLo kubectl.sha256 https://dl.k8s.io/release/v1.36.0/bin/linux/amd64/kubectl.sha256
+          printf '%s  kubectl\n' "$(cat kubectl.sha256)" | sha256sum -c -
+          chmod +x kind kubectl
+          echo "$RUNNER_TEMP/guard-tools" >> "$GITHUB_PATH"
+          python -m pip install --no-cache-dir ansible-core==2.21.6 kubernetes==37.0.2 jsonpatch==1.33 PyYAML==6.0.3 Jinja2==3.1.6
+          ansible-galaxy collection install kubernetes.core:6.4.0 -p "$RUNNER_TEMP/collections"
+          mkdir -p "$RUNNER_TEMP/guard-evidence"
+          python -m pip freeze > "$RUNNER_TEMP/guard-evidence/dependencies.txt"
+      - name: Create disposable kind cluster
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(kind get clusters 2>/dev/null)" || { echo 'Unexpected pre-existing kind cluster'; exit 1; }
+          kind create cluster --name summit-drift --image kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5 --wait 180s
+          kind version
+          kubectl version
+          docker version
+      - name: Execute original 28-case pilot
+        shell: bash
+        run: |
+          set -euo pipefail
+          python summit_approval_guard_pilot.py --collections "$RUNNER_TEMP/collections" --confirm 'RUN LOCAL GUARD PILOT' | tee "$RUNNER_TEMP/guard-evidence/pilot-output.txt"
+      - name: Collect allowlisted synthetic evidence
+        if: always()
+        shell: bash
+        run: |
+          python - <<'PYCODE'
+          from pathlib import Path
+          import os, json, shutil, hashlib
+          root=Path.home()/'Downloads'/'summit-guard-pilot-private'
+          dest=Path(os.environ['RUNNER_TEMP'])/'guard-evidence'
+          dest.mkdir(exist_ok=True)
+          for run in root.glob('*'):
+              if not run.is_dir(): continue
+              out=dest/run.name
+              out.mkdir(exist_ok=True)
+              for p in run.glob('*.json'):
+                  if p.name in ('provenance.json','results.json') or p.name.endswith(('-before.json','-after.json','-intermediate.json')):
+                      shutil.copyfile(p,out/p.name)
+                  elif p.name.endswith('-module.json'):
+                      r=json.loads(p.read_text())
+                      (out/p.name).write_text(json.dumps({k:r[k] for k in ('failed','changed','status','reason','msg') if k in r},indent=2))
+          (dest/'hosted-run.json').write_text(json.dumps({k:os.environ.get(k) for k in ('GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT','GITHUB_SHA','RUNNER_OS','RUNNER_ARCH')},indent=2))
+          files=sorted(p for p in dest.rglob('*') if p.is_file())
+          (dest/'SHA256SUMS').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+str(p.relative_to(dest))+'\n' for p in files))
+          PYCODE
+      - name: Check receipt completeness (not prediction conformity)
+        if: success()
+        shell: bash
+        run: |
+          python - <<'PYCODE'
+          import json,os
+          from pathlib import Path
+          root=Path(os.environ['RUNNER_TEMP'])/'guard-evidence'
+          files=list(root.glob('*/results.json'))
+          assert len(files)==1,files
+          rows=json.loads(files[0].read_text())
+          assert len(rows)==28 and len({(r['case'],r['guard']) for r in rows})==28
+          assert (files[0].parent/'invalid-control-after.json').is_file()
+          print('RECEIPT_COMPLETE=YES; scientific findings require review')
+          PYCODE
+      - name: Retain evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: approval-guard-pilot-evidence
+          path: ${{ runner.temp }}/guard-evidence/
+          retention-days: 30
+          if-no-files-found: error
+      - name: Delete disposable hosted cluster
+        if: always()
+        shell: bash
+        run: |
+          if command -v kind >/dev/null; then kind delete cluster --name summit-drift; fi
