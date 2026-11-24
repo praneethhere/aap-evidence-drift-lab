@@ -35,3 +35,28 @@ The native AAP lab uses a different mechanism: `kubernetes.core.k8s` sends a JSO
 ## What the evidence does not prove
 
 No production deployment or incident; no frequency measurements; no independent reproduction of AAP runs; no independently verified human approver or separation of duties; no binding of an AAP approval decision to a cryptographically signed object snapshot; no tested HPA/GitOps-owned workload; no promise of stable desired state after read-back. The workflow's native AAP records are author-reported, and the actual OpenShift API endpoint for those historical jobs has not been independently verified from a publicly available artifact.
+
+## W5C native AAP scale approval comparison
+
+On November 23, 2026, an author-operated AAP Developer Sandbox
+executed fresh and stale approval trials against an isolated
+OpenShift Deployment.
+
+| Trial | Scale job | Changed | Final desired replicas | Verification |
+|---|---|---|---|---|
+| Fresh #146 | Successful | true | 1 | Successful |
+| Stale #155 | Successful | false | 2 | Failed replica assertion |
+
+The stale action recorded a warning and followed the AAP success
+edge despite not reaching the approved replica count of one.
+
+Trial #152 was aborted before scaling after a resourceVersion
+change without a generation or desired replica change.
+
+Evidence: [W5C controller receipt](w5c_controller_receipt.json).
+
+This is author-projected evidence derived from private controller
+API exports, not independent human replication or a signed
+controller attestation. Runtime collection version remains unknown.
+No production impact, frequency or race-safety claim is made.
+The separate pinned kind CI experiment remains a distinct control.

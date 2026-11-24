@@ -1,0 +1,182 @@
+{
+  "capture_action_verify_playbooks": [
+    "ansible/aap_native/20_capture.yml",
+    "ansible/aap_native/26_scale_action_stale_success.yml",
+    "ansible/aap_native/22_verify_first.yml"
+  ],
+  "configured_controller_version_if_reported": "4.8.12",
+  "limitations": [
+    "Not independent human replication or a signed controller attestation. Raw exports remain private.",
+    "Hash commitments do not authenticate controller origin or permit independent inspection of withheld files.",
+    "Warnings are presence-only; raw warning text is not reproduced.",
+    "Approval decisions were submitted by the author; the stale approval was deliberate.",
+    "One completed fresh and one completed stale trial; no production impact, frequency or race-safety claim.",
+    "Desired replicas, not pod readiness, are measured. Runtime collection version and exact module hash are not established.",
+    "Historical conditional-patch AAP runs and separate pinned kind CI controls are distinct experiment series."
+  ],
+  "private_source_file_sha256": {
+    "approval-149.json": "eab589767006fceeadee5db128ebaee04923befaddf7b6d62bce71d2b877142a",
+    "approval-154.json": "4f529c2a34f53a01b02de026ffac158802636143f1c412515a4c2ce110a1ead8",
+    "approval-157.json": "c9a962637ace52cd3bffda80dfe48a50d1c2938df6d5ce1a0531e43d4f7dd3ef",
+    "controller-ping.json": "1ac7f6c67e8c8874932b77dee61d5675a3a35e455d9bc15ed2050a96d205fc2b",
+    "job-147-events.json": "2e0f92bcb645a38c0023c6fdcf235e87a98c810e837c6f07b64d5a37df282b52",
+    "job-147.json": "df53c088b040d1c677c43a41f8105ca0c51d863452676d486d7511555ef2a2ae",
+    "job-150-events.json": "1c6f788e07510ba7b6fca8b6dbfc03e3575d7c89ad92518b74d38ba14c3ac029",
+    "job-150.json": "90f16fc616e3e2c1a86e0a0136ccbd2a31b94272a6394b2e56c74239f95af78d",
+    "job-151-events.json": "e85cc6f85ac318eb5c01afce36e827bc965e4dbda036127d8ac6e05896ddc670",
+    "job-151.json": "03cad5d10b7f50f16c4c5d1b1023b10ceb938988771d3e6cc76b190ae3fe5199",
+    "job-153-events.json": "6070dc52e6c59db3b3fcde1c61bc846ebb507aad8b4a2440e2a8f660d200c4ff",
+    "job-153.json": "e784df3f783b36e4541c0f6a46c47bf522c606041876f37aaeaacee75dd38005",
+    "job-156-events.json": "ddd8d42084a009a68f772c77aff7e714e741fbcc9033bd87103e7aa549ff905a",
+    "job-156.json": "efd8689d03eaf302dc57c1ec8f52e1020a228606921abeff448ad41a0bb65cd7",
+    "job-158-events.json": "30ce44a07bc8fb0c05eb03b02f402ec642ef19d709f75b0a1767e4fb2fb6dff2",
+    "job-158.json": "295a480626fa4875986ebf7d7d9b3b02289964ecd02fb8bc123a824c4c300ce4",
+    "job-159-events.json": "23693b1fc34438ccf2fb5908ec32d381bf3c70b2bbff03de010792fd2e05b604",
+    "job-159.json": "f336f6c86e803f713c97e836c62899eb8774a8765329461171d8268e26998a07",
+    "target-readback-after-stale.json": "f75000d7a37dc2f834a8a35667540e5bf963011a819a2870e6572509c2e9cf9d",
+    "workflow-146-nodes.json": "050a35585fcf0742a2f1e6634966f63063717794475c369515d05aa10e290623",
+    "workflow-146.json": "01d26ed3cab503b82db5abfd39d03c82fa3d57eeb9b20a885f157fef53633b95",
+    "workflow-152-nodes.json": "e946f10424a697ec3d06dbadf6a6ea5e37a31e7d586a148180ba98f79b05b325",
+    "workflow-152.json": "774454fac116f56ac489124e38dc2c06dbaeef093ac0b9f3234ac7832f1cfefc",
+    "workflow-155-nodes.json": "f7cd6d90ed9135d71bd09fce61cd961aa357aab705935ea87d3eb1341126c0ac",
+    "workflow-155.json": "33e9660ddfa7745a6e285ddf10c9d25659c8a23df0dada2b995b8753f338fc5b"
+  },
+  "provenance": "author-operated Red Hat AAP Developer Sandbox targeting an isolated OpenShift Deployment; selected fields projected offline from private API exports",
+  "raw_export_manifest_entries_verified": 28,
+  "runtime_kubernetes_core_version": "unknown",
+  "schema": "w5c-author-projected-controller-receipt-v1",
+  "source_revision": "daad13458dbca017a9f78f9bca190d035afa8302",
+  "trials": [
+    {
+      "capture": {
+        "desired_replicas": 1,
+        "generation": 14,
+        "replicas": 0,
+        "resource_version": "6404651209"
+      },
+      "final_desired_replicas": 1,
+      "final_replica_evidence": "successful verifier requires replicas == 1; earlier author CLI observation also reported 1",
+      "nodes": {
+        "approve": {
+          "job_id": 149,
+          "status": "successful"
+        },
+        "capture": {
+          "event_count": 15,
+          "job_id": 147,
+          "status": "successful"
+        },
+        "scale": {
+          "artifact_changed": true,
+          "event_count": 21,
+          "job_id": 150,
+          "status": "successful",
+          "task_result": {
+            "changed": true,
+            "controller_event_id": 1053,
+            "event": "runner_on_ok",
+            "warning_recorded": false
+          }
+        },
+        "verify": {
+          "event_count": 9,
+          "job_id": 151,
+          "status": "successful",
+          "task_result": {
+            "changed": false,
+            "controller_event_id": 1064,
+            "event": "runner_on_ok",
+            "warning_recorded": false
+          }
+        }
+      },
+      "workflow_job_id": 146,
+      "workflow_status": "successful"
+    },
+    {
+      "capture": {
+        "desired_replicas": 1,
+        "generation": 16,
+        "replicas": 0,
+        "resource_version": "6434876159"
+      },
+      "disposition": "aborted before action; author observed resourceVersion change without generation or desired replica change; exact changed fields unknown",
+      "nodes": {
+        "approve": {
+          "job_id": 154,
+          "status": "failed"
+        },
+        "capture": {
+          "event_count": 15,
+          "job_id": 153,
+          "status": "successful"
+        },
+        "scale": {
+          "job_id": null,
+          "status": "not_started"
+        },
+        "verify": {
+          "job_id": null,
+          "status": "not_started"
+        }
+      },
+      "workflow_job_id": 152,
+      "workflow_status": "failed"
+    },
+    {
+      "capture": {
+        "desired_replicas": 1,
+        "generation": 16,
+        "replicas": 0,
+        "resource_version": "6434877978"
+      },
+      "final_desired_replicas": 2,
+      "final_replica_evidence": "failed replica assertion plus separate post-run OpenShift API read-back",
+      "nodes": {
+        "approve": {
+          "job_id": 157,
+          "status": "successful"
+        },
+        "capture": {
+          "event_count": 15,
+          "job_id": 156,
+          "status": "successful"
+        },
+        "scale": {
+          "artifact_changed": false,
+          "event_count": 24,
+          "job_id": 158,
+          "status": "successful",
+          "task_result": {
+            "changed": false,
+            "controller_event_id": 1112,
+            "event": "runner_on_ok",
+            "warning_recorded": true
+          }
+        },
+        "verify": {
+          "event_count": 9,
+          "job_id": 159,
+          "status": "failed",
+          "task_result": {
+            "changed": false,
+            "controller_event_id": 1128,
+            "event": "runner_on_failed",
+            "expected_failure_message_matched": true,
+            "failed_assertion": "(final_target.resources[0].spec.replicas | int) == 1",
+            "warning_recorded": false
+          }
+        }
+      },
+      "post_run_readback": {
+        "generation": 17,
+        "replicas": 2,
+        "resource_version": "6434891378",
+        "same_target_uid_as_capture": true
+      },
+      "workflow_job_id": 155,
+      "workflow_status": "failed"
+    }
+  ],
+  "workflow_template_id": 68
+}
