@@ -1,0 +1,65 @@
+---
+- name: Execute captured guard against isolated deployment
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Require captured premise and isolated target
+      ansible.builtin.assert:
+        that:
+          - guard_case in ['a', 'b', 'c']
+          - guard_target == guard_prefix ~ '-' ~ guard_case
+          - guard_prefix is match('^edlab-guard-[0-9a-f]{8}$')
+          - guard_kind == ('whole-version' if guard_case == 'c' else 'policy-aware')
+          - guard_evidence is defined
+          - guard_evidence.name == guard_target
+          - guard_evidence.case == guard_case
+          - guard_evidence.kind == guard_kind
+          - guard_evidence.replicas | int == 0
+          - guard_evidence.tier == 'standard'
+          - guard_evidence.uid | length > 0
+          - guard_evidence.rv | string | length > 0
+    - name: Define tests against captured evidence only
+      ansible.builtin.set_fact:
+        guard_identity:
+          - {op: test, path: /metadata/uid, value: "{{ guard_evidence.uid }}"}
+        guard_version:
+          - {op: test, path: /metadata/resourceVersion, value: "{{ guard_evidence.rv | string }}"}
+        guard_policy:
+          - {op: test, path: /spec/replicas, value: "{{ guard_evidence.replicas | int }}"}
+          - {op: test, path: /metadata/generation, value: "{{ guard_evidence.generation | int }}"}
+          - {op: test, path: /metadata/labels/approval-tier, value: "{{ guard_evidence.tier }}"}
+        guard_mutation:
+          - {op: replace, path: /spec/replicas, value: 1}
+    - name: Assemble one conditional write
+      ansible.builtin.set_fact:
+        guard_patch: "{{ guard_identity + (guard_version if guard_kind == 'whole-version' else guard_policy) + guard_mutation }}"
+    - name: Execute server-side JSON Patch
+      kubernetes.core.k8s_json_patch:
+        api_version: apps/v1
+        kind: Deployment
+        namespace: praneethhere-dev
+        name: "{{ guard_target }}"
+        patch: "{{ guard_patch }}"
+        wait: false
+      register: patch_result
+      no_log: true
+      ignore_errors: true
+    - name: Export allowlisted action receipt
+      ansible.builtin.set_stats:
+        per_host: false
+        aggregate: false
+        data:
+          guard_action_receipt:
+            case: "{{ guard_case }}"
+            name: "{{ guard_target }}"
+            patch: "{{ guard_patch }}"
+            failed: "{{ patch_result.failed | default(false) | bool }}"
+            changed: "{{ patch_result.changed | default(false) | bool }}"
+            status: "{{ patch_result.status | default(none) }}"
+            reason: "{{ patch_result.reason | default('') }}"
+            generic_invalid: "{{ 'the server rejected our request due to an error in our request' in (patch_result.msg | default('') | string) }}"
+    - name: Preserve failed action outcome
+      ansible.builtin.fail:
+        msg: 'Conditional mutation failed; inspect independent readback and captured tests.'
+      when: patch_result.failed | default(false) | bool

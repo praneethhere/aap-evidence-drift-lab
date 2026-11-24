@@ -1,0 +1,83 @@
+---
+- name: Capture isolated approval guard premise
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Check experiment inputs
+      ansible.builtin.assert:
+        that:
+          - guard_case in ['a', 'b', 'c']
+          - guard_target == guard_prefix ~ '-' ~ guard_case
+          - guard_prefix is match('^edlab-guard-[0-9a-f]{8}$')
+          - guard_kind == ('whole-version' if guard_case == 'c' else 'policy-aware')
+    - name: Record collection inventory from actual EE
+      ansible.builtin.command:
+        argv: [ansible-galaxy, collection, list, kubernetes.core, --format, json]
+      register: collection_inventory
+      changed_when: false
+    - name: Check patch module resolves in actual EE
+      ansible.builtin.command:
+        argv: [ansible-doc, -t, module, -j, kubernetes.core.k8s_json_patch]
+      register: patch_doc
+      changed_when: false
+      no_log: true
+    - name: Confirm module documentation resolves
+      ansible.builtin.assert:
+        that:
+          - "'kubernetes.core.k8s_json_patch' in (patch_doc.stdout | from_json)"
+    - name: Fingerprint actual resolved patch module
+      ansible.builtin.stat:
+        path: "{{ (patch_doc.stdout | from_json)['kubernetes.core.k8s_json_patch'].doc.filename }}"
+        checksum_algorithm: sha256
+      register: patch_module_stat
+    - name: Require module fingerprint
+      ansible.builtin.assert:
+        that:
+          - patch_module_stat.stat.exists
+          - patch_module_stat.stat.checksum is defined
+    - name: Check Python dependencies
+      ansible.builtin.command:
+        argv:
+          - "{{ ansible_playbook_python }}"
+          - -c
+          - "import kubernetes, jsonpatch, yaml; print(kubernetes.__version__)"
+      register: client_version
+      changed_when: false
+    - name: Read isolated target
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        namespace: praneethhere-dev
+        name: "{{ guard_target }}"
+      register: target
+      no_log: true
+    - name: Require exact synthetic baseline
+      ansible.builtin.assert:
+        that:
+          - target.resources | length == 1
+          - target.resources[0].metadata.name == guard_target
+          - target.resources[0].metadata.namespace == 'praneethhere-dev'
+          - target.resources[0].metadata.labels['guard-run'] == guard_prefix
+          - target.resources[0].metadata.labels['approval-tier'] == 'standard'
+          - target.resources[0].spec.replicas | int == 0
+          - target.resources[0].spec.paused | bool
+    - name: Export captured premise for native approval
+      ansible.builtin.set_stats:
+        per_host: false
+        aggregate: false
+        data:
+          guard_evidence:
+            name: "{{ guard_target }}"
+            case: "{{ guard_case }}"
+            kind: "{{ guard_kind }}"
+            uid: "{{ target.resources[0].metadata.uid }}"
+            rv: "{{ target.resources[0].metadata.resourceVersion | string }}"
+            generation: "{{ target.resources[0].metadata.generation | int }}"
+            replicas: "{{ target.resources[0].spec.replicas | int }}"
+            tier: "{{ target.resources[0].metadata.labels['approval-tier'] }}"
+            spec: "{{ target.resources[0].spec }}"
+          guard_ee_collections: "{{ collection_inventory.stdout | from_json }}"
+          guard_ee_kubernetes_client: "{{ client_version.stdout }}"
+          guard_ee_module_sha256: "{{ patch_module_stat.stat.checksum }}"
+          guard_ee_module_path: "{{ (patch_doc.stdout | from_json)['kubernetes.core.k8s_json_patch'].doc.filename }}"
