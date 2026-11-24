@@ -60,3 +60,16 @@ API exports, not independent human replication or a signed
 controller attestation. Runtime collection version remains unknown.
 No production impact, frequency or race-safety claim is made.
 The separate pinned kind CI experiment remains a distinct control.
+
+### W5C execution environment provenance
+
+Historical controller records for scale jobs 150 and 158
+both report execution environment ID 2 and the same
+digest-pinned configured image:
+
+`registry.redhat.io/ansible-automation-platform-27/ee-supported-rhel9@sha256:2318369ab1c83013228371694016836c058e0b891f405fa0ae8af83a54e7ba39`
+
+Both jobs executed source revision `daad13458dbca017a9f78f9bca190d035afa8302`.
+This is historical configured-image metadata, not an
+independent runtime image attestation. The exact runtime
+kubernetes.core version and module hash remain unknown.
