@@ -19,21 +19,8 @@
           - guard_evidence.tier == 'standard'
           - guard_evidence.uid | length > 0
           - guard_evidence.rv | string | length > 0
-    - name: Define tests against captured evidence only
-      ansible.builtin.set_fact:
-        guard_identity:
-          - {op: test, path: /metadata/uid, value: "{{ guard_evidence.uid }}"}
-        guard_version:
-          - {op: test, path: /metadata/resourceVersion, value: "{{ guard_evidence.rv | string }}"}
-        guard_policy:
-          - {op: test, path: /spec/replicas, value: "{{ guard_evidence.replicas | int }}"}
-          - {op: test, path: /metadata/generation, value: "{{ guard_evidence.generation | int }}"}
-          - {op: test, path: /metadata/labels/approval-tier, value: "{{ guard_evidence.tier }}"}
-        guard_mutation:
-          - {op: replace, path: /spec/replicas, value: 1}
-    - name: Assemble one conditional write
-      ansible.builtin.set_fact:
-        guard_patch: "{{ guard_identity + (guard_version if guard_kind == 'whole-version' else guard_policy) + guard_mutation }}"
+    - name: Rebuild and verify typed patch from captured evidence
+      ansible.builtin.include_tasks: typed_patch.yml
     - name: Execute server-side JSON Patch
       kubernetes.core.k8s_json_patch:
         api_version: apps/v1

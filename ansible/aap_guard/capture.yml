@@ -62,21 +62,28 @@
           - target.resources[0].metadata.labels['approval-tier'] == 'standard'
           - target.resources[0].spec.replicas | int == 0
           - target.resources[0].spec.paused | bool
+    - name: Store captured premise
+      ansible.builtin.set_fact:
+        guard_evidence:
+          name: "{{ guard_target }}"
+          case: "{{ guard_case }}"
+          kind: "{{ guard_kind }}"
+          uid: "{{ target.resources[0].metadata.uid }}"
+          rv: "{{ target.resources[0].metadata.resourceVersion | string }}"
+          generation: "{{ target.resources[0].metadata.generation | int }}"
+          replicas: "{{ target.resources[0].spec.replicas | int }}"
+          tier: "{{ target.resources[0].metadata.labels['approval-tier'] }}"
+          spec: "{{ target.resources[0].spec }}"
+    - name: Run typed patch canary before approval
+      ansible.builtin.include_tasks: typed_patch.yml
     - name: Export captured premise for native approval
       ansible.builtin.set_stats:
         per_host: false
         aggregate: false
         data:
-          guard_evidence:
-            name: "{{ guard_target }}"
-            case: "{{ guard_case }}"
-            kind: "{{ guard_kind }}"
-            uid: "{{ target.resources[0].metadata.uid }}"
-            rv: "{{ target.resources[0].metadata.resourceVersion | string }}"
-            generation: "{{ target.resources[0].metadata.generation | int }}"
-            replicas: "{{ target.resources[0].spec.replicas | int }}"
-            tier: "{{ target.resources[0].metadata.labels['approval-tier'] }}"
-            spec: "{{ target.resources[0].spec }}"
+          guard_evidence: "{{ guard_evidence }}"
+          guard_patch_canary: "{{ guard_patch }}"
+          guard_ee_ansible_core: "{{ ansible_version.full }}"
           guard_ee_collections: "{{ collection_inventory.stdout | from_json }}"
           guard_ee_kubernetes_client: "{{ client_version.stdout }}"
           guard_ee_module_sha256: "{{ patch_module_stat.stat.checksum }}"

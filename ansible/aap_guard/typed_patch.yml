@@ -1,0 +1,59 @@
+---
+- name: Construct typed JSON Patch in the actual execution environment
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_playbook_python }}"
+      - -c
+      - |
+        import json, sys
+        kind, uid, rv, replicas, generation, tier = sys.argv[1:]
+        assert kind in ('policy-aware', 'whole-version')
+        assert replicas == '0' and generation.isdecimal() and int(generation) >= 1
+        assert uid and rv and tier == 'standard'
+        patch = [{'op': 'test', 'path': '/metadata/uid', 'value': uid}]
+        if kind == 'whole-version':
+            patch.append({'op': 'test', 'path': '/metadata/resourceVersion', 'value': rv})
+        else:
+            patch.extend([
+                {'op': 'test', 'path': '/spec/replicas', 'value': int(replicas)},
+                {'op': 'test', 'path': '/metadata/generation', 'value': int(generation)},
+                {'op': 'test', 'path': '/metadata/labels/approval-tier', 'value': tier},
+            ])
+        patch.append({'op': 'replace', 'path': '/spec/replicas', 'value': 1})
+        print(json.dumps(patch))
+      - "{{ guard_kind }}"
+      - "{{ guard_evidence.uid }}"
+      - "{{ guard_evidence.rv | string }}"
+      - "{{ guard_evidence.replicas | string }}"
+      - "{{ guard_evidence.generation | string }}"
+      - "{{ guard_evidence.tier }}"
+  register: guard_builder
+  changed_when: false
+- name: Decode structured JSON Patch
+  ansible.builtin.set_fact:
+    guard_patch: "{{ guard_builder.stdout | from_json }}"
+- name: Require exact guard layout and strict JSON value types
+  ansible.builtin.assert:
+    that:
+      - guard_patch is sequence and guard_patch is not string and guard_patch is not mapping
+      - guard_patch | length == (3 if guard_kind == 'whole-version' else 5)
+      - guard_patch[0].op == 'test' and guard_patch[0].path == '/metadata/uid'
+      - guard_patch[0].value is string and guard_patch[0].value == guard_evidence.uid
+      - guard_patch[-1].op == 'replace' and guard_patch[-1].path == '/spec/replicas'
+      - guard_patch[-1].value is integer and guard_patch[-1].value == 1
+- name: Require string resourceVersion for whole-version guard
+  ansible.builtin.assert:
+    that:
+      - guard_patch[1].op == 'test' and guard_patch[1].path == '/metadata/resourceVersion'
+      - guard_patch[1].value is string and guard_patch[1].value == (guard_evidence.rv | string)
+  when: guard_kind == 'whole-version'
+- name: Require numeric replica and generation tests for policy-aware guard
+  ansible.builtin.assert:
+    that:
+      - guard_patch[1].op == 'test' and guard_patch[1].path == '/spec/replicas'
+      - guard_patch[1].value is integer and guard_patch[1].value == (guard_evidence.replicas | int)
+      - guard_patch[2].op == 'test' and guard_patch[2].path == '/metadata/generation'
+      - guard_patch[2].value is integer and guard_patch[2].value == (guard_evidence.generation | int)
+      - guard_patch[3].op == 'test' and guard_patch[3].path == '/metadata/labels/approval-tier'
+      - guard_patch[3].value is string and guard_patch[3].value == guard_evidence.tier
+  when: guard_kind == 'policy-aware'
